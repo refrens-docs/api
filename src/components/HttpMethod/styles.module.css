@@ -1,0 +1,9 @@
+.container {
+  padding: 4px 8px;
+  background-color: #733dd9;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: white;
+  text-transform: uppercase;
+}
