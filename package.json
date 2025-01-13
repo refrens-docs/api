@@ -33,11 +33,19 @@
     "@docusaurus/module-type-aliases": "3.7.0",
     "@docusaurus/tsconfig": "3.7.0",
     "@docusaurus/types": "3.7.0",
+    "@eslint/js": "^9.18.0",
     "commitiquette": "^1.2.1",
     "commitizen": "^4.3.1",
     "cz-conventional-changelog": "^3.3.0",
+    "eslint": "^9.18.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-react": "^7.37.4",
+    "globals": "^15.14.0",
     "husky": "^9.1.7",
-    "typescript": "~5.6.2"
+    "lint-staged": "^15.3.0",
+    "prettier": "^3.4.2",
+    "typescript": "~5.6.2",
+    "typescript-eslint": "^8.19.1"
   },
   "browserslist": {
     "production": [
@@ -58,5 +66,14 @@
     "commitizen": {
       "path": "commitiquette"
     }
+  },
+  "lint-staged": {
+    "**/*.{js,jsx,ts,tsx,mjs}": [
+      "prettier --write",
+      "eslint --fix"
+    ],
+    "**/*.{json,css,html,md,sass,scss,vue,yaml,yml}": [
+      "prettier --write"
+    ]
   }
 }
