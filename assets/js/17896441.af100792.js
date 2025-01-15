@@ -1,0 +1,1 @@
+"use strict";(self.webpackChunkrefrens_documentation=self.webpackChunkrefrens_documentation||[]).push([[401],{5303:(e,t,n)=>{n.d(t,{A:()=>p});var s=n(5359),a=n(5537),r=n(9329);const c="container_AeEI";var o=n(4848);const u=e=>{let{type:t}=e;return(0,o.jsx)("span",{className:c,children:t})},p={...s.A,Tabs:a.A,TabItem:r.A,HttpMethod:u}}}]);
