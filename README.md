@@ -1,3 +1,5 @@
+[![Commitizen friendly](https://img.shields.io/badge/commitizen-friendly-brightgreen.svg)](http://commitizen.github.io/cz-cli/)
+
 # Website
 
 This website is built using [Docusaurus](https://docusaurus.io/), a modern static website generator.
@@ -23,6 +25,12 @@ $ npm build
 ```
 
 This command generates static content into the `build` directory and can be served using any static contents hosting service.
+
+### Creating Docs
+
+Create a new mdx file inside `docs/` folder. MDX is just markdown with support for React components. Learn more [here](https://docusaurus.io/docs/markdown-features/react)
+
+Docusaurus provides a list of components which you can use by importing them. The list can be viewed [here](https://docusaurus.io/docs/markdown-features#standard-features)
 
 ### Deployment
 
