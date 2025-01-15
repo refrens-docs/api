@@ -18,4 +18,4 @@ The following points are applicable across all API endpoints -
 - API response status is indicated as HTTP response code. ie, `200` is a success, `201` is created, `4xx` are errors.
 - Most of the endpoints require an Authorization header with a JWT token in the following format -
 - Authorization: Bearer `<jwt>`
-  - You can either obtain a token via [Authentication API](./authentication.md) call or [Self Sign](./authentication.md#self-signed-tokens) using privateKey provided by us.
+  - You can either obtain a token via [Authentication API](authentication) call or [Self Sign](authentication#self-signed-tokens) using privateKey provided by us.
