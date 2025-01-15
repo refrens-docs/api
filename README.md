@@ -32,6 +32,8 @@ Create a new mdx file inside `docs/` folder. MDX is just markdown with support f
 
 Docusaurus provides a list of components which you can use by importing them. The list can be viewed [here](https://docusaurus.io/docs/markdown-features#standard-features)
 
+Certain components like `Tabs`, `TabItem`, are made available globally. You don't have to import them. You can add your own components too by making your component available for export in the `MDXComponents.ts` file.
+
 ### Deployment
 
 Using SSH:
