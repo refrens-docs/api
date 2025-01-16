@@ -4,20 +4,25 @@ import type * as Preset from '@docusaurus/preset-classic';
 
 // This runs in Node.js - Don't use client-side code here (browser APIs, JSX...)
 
+console.log(process.env.NODE_ENV);
+
+const REPO_NAME = 'api';
+const ORG_NAME = 'refrens-docs';
+
 const config: Config = {
   title: 'Refrens Documentation',
   tagline: 'Docs, API refrences and more',
   favicon: 'img/favicon.ico',
 
   // Set the production url of your site here
-  url: 'https://refrens-docs.github.io',
+  url: `https://${ORG_NAME}.github.io`,
   // Set the /<baseUrl>/ pathname under which your site is served
   // For GitHub pages deployment, it is often '/<projectName>/'
-  baseUrl: '/',
+  baseUrl: process.env.NODE_ENV === 'development' ? '/' : `/${REPO_NAME}/`,
   // GitHub pages deployment config.
   // If you aren't using GitHub pages, you don't need these.
-  organizationName: 'refrens-docs', // Usually your GitHub org/user name.
-  projectName: 'api', // Usually your repo name.
+  organizationName: ORG_NAME, // Usually your GitHub org/user name.
+  projectName: REPO_NAME, // Usually your repo name.
   trailingSlash: false,
   onBrokenLinks: 'throw',
   deploymentBranch: 'gh-pages',
@@ -38,7 +43,7 @@ const config: Config = {
           sidebarPath: './sidebars.ts',
           // Please change this to your repo.
           // Remove this to remove the "edit this page" links.
-          editUrl: 'https://github.com/refrens-docs/api',
+          editUrl: `https://github.com/${ORG_NAME}/${REPO_NAME}`,
           routeBasePath: '/',
         },
         blog: false,
@@ -60,7 +65,7 @@ const config: Config = {
       },
       items: [
         {
-          href: 'https://github.com/refrens-docs',
+          href: `https://github.com/${ORG_NAME}`,
           label: 'GitHub',
           position: 'right',
         },
