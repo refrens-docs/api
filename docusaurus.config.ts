@@ -1,5 +1,5 @@
-import { themes as prismThemes } from 'prism-react-renderer';
 import type { Config } from '@docusaurus/types';
+import { themes as prismThemes } from 'prism-react-renderer';
 import type * as Preset from '@docusaurus/preset-classic';
 
 // This runs in Node.js - Don't use client-side code here (browser APIs, JSX...)
@@ -18,7 +18,7 @@ const config: Config = {
   url: `https://${ORG_NAME}.github.io`,
   // Set the /<baseUrl>/ pathname under which your site is served
   // For GitHub pages deployment, it is often '/<projectName>/'
-  baseUrl: process.env.NODE_ENV === 'development' ? '/' : `/${REPO_NAME}/`,
+  baseUrl: process.env.NODE_ENV === 'production' ? `/${REPO_NAME}/` : '/',
   // GitHub pages deployment config.
   // If you aren't using GitHub pages, you don't need these.
   organizationName: ORG_NAME, // Usually your GitHub org/user name.
