@@ -8,10 +8,7 @@ const REPO_NAME = 'api';
 const ORG_NAME = 'refrens-docs';
 const GITHUB_REPO_URL = `https://github.com/${ORG_NAME}/${REPO_NAME}`;
 
-const editUrlFunction = ({ docPath, versionDocsDirPath, ...restProps }) => {
-  for (const key in restProps) {
-    console.log(`${key}: ${restProps[key]}`);
-  }
+const editUrlFunction = ({ docPath, versionDocsDirPath }) => {
   return `${GITHUB_REPO_URL}/edit/main/${versionDocsDirPath}/${docPath}`;
 };
 
