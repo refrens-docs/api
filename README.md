@@ -32,20 +32,14 @@ Create a new mdx file inside `docs/` folder. MDX is just markdown with support f
 
 Docusaurus provides a list of components which you can use by importing them. The list can be viewed [here](https://docusaurus.io/docs/markdown-features#standard-features)
 
-Certain components like `Tabs`, `TabItem`, are made available globally. You don't have to import them. You can add your own components too by making your component available for export in the `MDXComponents.ts` file.
+Certain components like `Tabs`, `TabItem`, are made available globally. You don't have to import them. You can make components available globally by exporting them from `MDXComponents.ts` file. Lear more [here](https://docusaurus.io/docs/markdown-features/react#mdx-component-scope)
 
 ### Deployment
 
 Using SSH:
 
 ```
-$ USE_SSH=true yarn deploy
-```
-
-Not using SSH:
-
-```
-$ GIT_USER=<Your GitHub username> yarn deploy
+$ npm run deploy
 ```
 
 If you are using GitHub pages for hosting, this command is a convenient way to build the website and push to the `gh-pages` branch.
