@@ -10,7 +10,7 @@ title: Getting Started
 
 To access Refrens API, you need to have API enabled on your business account. If you have a Refrens Premium account, please contact support (care@refrens.com or on [chat](https://www.refrens.com)) to enable API for you.
 
-The following points are applicable across all API endpoints -
+The following points/rules are applicable across all API endpoints -
 
 - API follows REST conventions, ie creating a resource is `POST`, fetching is `GET`, updates are `PATCH`
 - All API responses and request bodies are in JSON format.
