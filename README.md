@@ -1,45 +1,14 @@
-[![Commitizen friendly](https://img.shields.io/badge/commitizen-friendly-brightgreen.svg)](http://commitizen.github.io/cz-cli/)
+# How to Edit Documentation Files
 
-# Website
+Welcome! If you’d like to make changes to the documentation, this guide will help you through the process.
 
-This website is built using [Docusaurus](https://docusaurus.io/), a modern static website generator.
+1. Locate the `docs` folder in the repository, this is where all the documentation files are stored. If you're having trouble finding it, you can [click here to go directly to the docs folder](https://github.com/refrens-docs/api/tree/main/docs)
+2. Find the file you want to edit (for example, `authentication.mdx`).
+3. Click on the file to open it in the GitHub editor.
+4. Once you’ve made your changes, you can preview them. If you need help with Markdown syntax, check out [this guide on Markdown](https://www.markdownguide.org/cheat-sheet/).
 
-### Installation
-
-```
-$ npm i
-```
-
-### Local Development
-
-```
-$ npm start
-```
-
-This command starts a local development server and opens up a browser window. Most changes are reflected live without having to restart the server.
-
-### Build
-
-```
-$ npm build
-```
-
-This command generates static content into the `build` directory and can be served using any static contents hosting service.
-
-### Creating Docs
-
-Create a new mdx file inside `docs/` folder. MDX is just markdown with support for React components. Learn more [here](https://docusaurus.io/docs/markdown-features/react)
-
-Docusaurus provides a list of components which you can use by importing them. The list can be viewed [here](https://docusaurus.io/docs/markdown-features#standard-features)
-
-Certain components like `Tabs`, `TabItem`, are made available globally. You don't have to import them. You can make components available globally by exporting them from `MDXComponents.ts` file. Lear more [here](https://docusaurus.io/docs/markdown-features/react#mdx-component-scope)
-
-### Deployment
-
-Using SSH:
-
-```
-$ npm run deploy
-```
-
-If you are using GitHub pages for hosting, this command is a convenient way to build the website and push to the `gh-pages` branch.
+5. When you're ready to save your changes:
+   - Scroll to the bottom and click **Commit changes**.
+   - A popup will appear asking for your commit message, extended description, commit email, and a **Propose changes** button.
+   - Enter a brief message describing the change (e.g., "Fixed typo on homepage").
+   - Click the **Propose changes** button to submit your edits.
