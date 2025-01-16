@@ -4,14 +4,12 @@ import type * as Preset from '@docusaurus/preset-classic';
 
 // This runs in Node.js - Don't use client-side code here (browser APIs, JSX...)
 
-console.log(process.env.NODE_ENV);
-
 const REPO_NAME = 'api';
 const ORG_NAME = 'refrens-docs';
 
 const config: Config = {
   title: 'Refrens Documentation',
-  tagline: 'Docs, API refrences and more',
+  tagline: 'API References',
   favicon: 'img/favicon.ico',
 
   // Set the production url of your site here
