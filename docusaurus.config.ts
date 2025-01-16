@@ -6,6 +6,14 @@ import type * as Preset from '@docusaurus/preset-classic';
 
 const REPO_NAME = 'api';
 const ORG_NAME = 'refrens-docs';
+const GITHUB_REPO_URL = `https://github.com/${ORG_NAME}/${REPO_NAME}`;
+
+const editUrlFunction = ({ docPath, versionDocsDirPath, ...restProps }) => {
+  for (const key in restProps) {
+    console.log(`${key}: ${restProps[key]}`);
+  }
+  return `${GITHUB_REPO_URL}/edit/main/${versionDocsDirPath}/${docPath}`;
+};
 
 const config: Config = {
   title: 'Refrens Documentation',
@@ -41,7 +49,7 @@ const config: Config = {
           sidebarPath: './sidebars.ts',
           // Please change this to your repo.
           // Remove this to remove the "edit this page" links.
-          editUrl: `https://github.com/${ORG_NAME}/${REPO_NAME}`,
+          editUrl: editUrlFunction,
           routeBasePath: '/',
         },
         blog: false,
