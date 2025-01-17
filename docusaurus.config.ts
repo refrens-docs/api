@@ -4,11 +4,12 @@ import type * as Preset from '@docusaurus/preset-classic';
 
 // This runs in Node.js - Don't use client-side code here (browser APIs, JSX...)
 
+const TITLE = 'Refrens API';
 const REPO_NAME = 'api';
 const ORG_NAME = 'refrens-docs';
 
 const config: Config = {
-  title: 'Refrens API',
+  title: TITLE,
   tagline: 'API References',
   favicon: 'img/favicon.ico',
 
@@ -55,7 +56,7 @@ const config: Config = {
     // Replace with your project's social card
     image: 'img/logo.png',
     navbar: {
-      title: 'Refrens API',
+      title: TITLE,
       logo: {
         alt: 'Refrens Logo',
         src: 'img/logo.png',
