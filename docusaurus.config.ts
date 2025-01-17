@@ -8,7 +8,7 @@ const REPO_NAME = 'api';
 const ORG_NAME = 'refrens-docs';
 
 const config: Config = {
-  title: 'Refrens Documentation',
+  title: 'Refrens API',
   tagline: 'API References',
   favicon: 'img/favicon.ico',
 
@@ -55,7 +55,7 @@ const config: Config = {
     // Replace with your project's social card
     image: 'img/logo.png',
     navbar: {
-      title: 'Refrens Documentation',
+      title: 'Refrens API',
       logo: {
         alt: 'Refrens Logo',
         src: 'img/logo.png',
