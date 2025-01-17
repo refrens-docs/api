@@ -6,11 +6,6 @@ import type * as Preset from '@docusaurus/preset-classic';
 
 const REPO_NAME = 'api';
 const ORG_NAME = 'refrens-docs';
-const GITHUB_REPO_URL = `https://github.com/${ORG_NAME}/${REPO_NAME}`;
-
-const editUrlFunction = ({ docPath, versionDocsDirPath }) => {
-  return `${GITHUB_REPO_URL}/edit/main/${versionDocsDirPath}/${docPath}`;
-};
 
 const config: Config = {
   title: 'Refrens Documentation',
@@ -21,7 +16,7 @@ const config: Config = {
   url: `https://${ORG_NAME}.github.io`,
   // Set the /<baseUrl>/ pathname under which your site is served
   // For GitHub pages deployment, it is often '/<projectName>/'
-  baseUrl: process.env.NODE_ENV === 'production' ? `/${REPO_NAME}/` : '/',
+  baseUrl: process.env.NODE_ENV === 'production' ? `/${REPO_NAME}/documentation/` : '/',
   // GitHub pages deployment config.
   // If you aren't using GitHub pages, you don't need these.
   organizationName: ORG_NAME, // Usually your GitHub org/user name.
@@ -46,7 +41,6 @@ const config: Config = {
           sidebarPath: './sidebars.ts',
           // Please change this to your repo.
           // Remove this to remove the "edit this page" links.
-          editUrl: editUrlFunction,
           routeBasePath: '/',
         },
         blog: false,
@@ -67,12 +61,13 @@ const config: Config = {
         src: 'img/logo.png',
       },
       items: [
-        {
-          href: `https://github.com/${ORG_NAME}`,
-          label: 'GitHub',
-          position: 'right',
-        },
+        { label: 'Refrens.com', to: 'https://www.refrens.com/' },
+        { label: 'Login', to: 'https://www.refrens.com/login' },
       ],
+    },
+    footer: {
+      style: 'dark',
+      copyright: `© ${new Date().getFullYear()} Refrens Internet Pvt. Ltd. | All Rights Reserved.`,
     },
 
     prism: {
