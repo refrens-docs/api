@@ -16,7 +16,7 @@ const config: Config = {
   url: `https://${ORG_NAME}.github.io`,
   // Set the /<baseUrl>/ pathname under which your site is served
   // For GitHub pages deployment, it is often '/<projectName>/'
-  baseUrl: process.env.NODE_ENV === 'production' ? `/${REPO_NAME}/` : '/',
+  baseUrl: process.env.NODE_ENV === 'production' ? `/${REPO_NAME}/documentation/` : '/',
   // GitHub pages deployment config.
   // If you aren't using GitHub pages, you don't need these.
   organizationName: ORG_NAME, // Usually your GitHub org/user name.
