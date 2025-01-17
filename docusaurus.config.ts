@@ -21,7 +21,7 @@ const config: Config = {
   // If you aren't using GitHub pages, you don't need these.
   organizationName: ORG_NAME, // Usually your GitHub org/user name.
   projectName: REPO_NAME, // Usually your repo name.
-  trailingSlash: false,
+  trailingSlash: true,
   onBrokenLinks: 'throw',
   deploymentBranch: 'gh-pages',
   onBrokenMarkdownLinks: 'warn',
