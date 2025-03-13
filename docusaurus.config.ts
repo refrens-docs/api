@@ -56,16 +56,6 @@ const config: Config = {
   themeConfig: {
     // Replace with your project's social card
     image: 'img/logo.png',
-    headTags: [
-      // Declare a <link> preconnect tag
-      {
-        tagName: 'link',
-        attributes: {
-          rel: 'canonical',
-          href: 'https://example.com',
-        },
-      },
-    ],
     navbar: {
       title: TITLE,
       logo: {
