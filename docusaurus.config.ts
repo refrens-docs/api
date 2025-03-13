@@ -7,6 +7,7 @@ import type * as Preset from '@docusaurus/preset-classic';
 const TITLE = 'Refrens API';
 const REPO_NAME = 'api';
 const ORG_NAME = 'refrens-docs';
+const PROD_URL = 'https://refrens.com';
 
 const config: Config = {
   title: TITLE,
@@ -14,7 +15,7 @@ const config: Config = {
   favicon: 'img/favicon.ico',
 
   // Set the production url of your site here
-  url: `https://${ORG_NAME}.github.io`,
+  url: PROD_URL,
   // Set the /<baseUrl>/ pathname under which your site is served
   // For GitHub pages deployment, it is often '/<projectName>/'
   baseUrl: process.env.NODE_ENV === 'production' ? `/${REPO_NAME}/docs/` : '/',
