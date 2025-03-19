@@ -7,7 +7,7 @@ import type * as Preset from '@docusaurus/preset-classic';
 const TITLE = 'Refrens API';
 const REPO_NAME = 'api';
 const ORG_NAME = 'refrens-docs';
-const PROD_URL = 'https://refrens.com';
+const PROD_URL = 'https://www.refrens.com';
 
 const config: Config = {
   title: TITLE,
