@@ -2,7 +2,7 @@
 
 ### Create New Invoice
 
-<HttpMethod type="post" /> `/businesses/:urlKey/invoices`
+<HttpMethod type='post' /> `/businesses/:urlKey/invoices`
 
 This endpoint allows you to create an invoice
 
@@ -173,6 +173,7 @@ This endpoint allows you to create an invoice
     ```
 
     :::
+
   </TabItem>
 </Tabs>
 
@@ -180,7 +181,7 @@ This endpoint allows you to create an invoice
 
 ### Find Invoices
 
-<HttpMethod type="get" /> `/businesses/:urlKey/invoices`
+<HttpMethod type='get' /> `/businesses/:urlKey/invoices`
 
 This endpoint allows you to find created invoices
 
@@ -199,7 +200,7 @@ This endpoint allows you to find created invoices
 
     **Query Prams**
 
-    Optinal - Can be used for limiting results
+    Optional - Can be used for limiting results
 
     | Name                 | Type   | `Value` Description                                       |
     | -------------------- | ------ | --------------------------------------------------------- |
@@ -209,6 +210,7 @@ This endpoint allows you to find created invoices
     | $sort[createdAt]     | number | sort order on created date (1 ascending, -1 descending)   |
     | $sort[invoiceNumber] | number | sort order on invoice number (1 ascending, -1 descending) |
     | $sort[invoiceDate]   | number | sort order on invoice date (1 ascending, -1 descending)   |
+
    </TabItem>
 
    <TabItem value="response" label="Response">
@@ -244,11 +246,11 @@ This endpoint allows you to find created invoices
     ```
 
     :::
+
    </TabItem>
 </Tabs>
 
 ### Get Invoice
-
 
 <HttpMethod type='get' /> `/businesses/:urlKey/invoices/:invoiceId`
 
@@ -268,6 +270,7 @@ This endpoint allows you to get a invoice via invoiceId (\_id)
     | ---------------- | ------ | ------------------- |
     | Content-Type \*  | string | `application-json`  |
     | Authorization \* | string | `Bearer <jwt>`      |
+
   </TabItem>
 
   <TabItem value="response" label="Response">
@@ -383,5 +386,104 @@ This endpoint allows you to get a invoice via invoiceId (\_id)
     ```
 
     :::
+
+  </TabItem>
+</Tabs>
+
+---
+
+### Cancel Invoice
+
+<HttpMethod type='patch' /> `/businesses/:urlKey/invoices/:invoice?cancelPayment=true`
+
+This endpoint allows you to update an invoice for a specific business.
+
+<Tabs>
+  <TabItem value="request" label="Request">
+    **Path Params**
+
+    `urlKey` - The unique identifier of the business. <br />
+    `invoice` - The invoice ID for which the status is to be updated.
+
+    **Query Params**
+
+    | Name           | Type    | `Value` Description                              |
+    | -------------- | ------- | ----------------------------------------------- |
+    | cancelPayment  | boolean | Set to `true` if you want to cancel the associated payments. |
+
+    **Headers**
+
+    | Name             | Type   | `Value` Description |
+    | ---------------- | ------ | ------------------- |
+    | Content-Type \*  | string | `application-json`  |
+    | Authorization \* | string | `Bearer <jwt>`      |
+
+    **Body**
+
+    ```json
+    {
+      "status": "CANCELED"
+    }
+    ```
+
+  </TabItem>
+
+  <TabItem value="response" label="Response">
+    :::success `200: OK`
+    Upon successful execution, the API responds with a status code of 200 and a JSON object containing the updated details of the invoice.
+
+    ```json
+    {
+      "_id": "60cc8cc6aa3024abd4bef447",
+      "invoiceNumber": "APP-2020-0004",
+      "status": "CANCELED",
+      "currency": "INR",
+      "invoiceTitle": "Invoice",
+      "billType": "INVOICE",
+      "discount": {
+        "discountType": "PERCENTAGE"
+      },
+      "items": [
+        {
+          "name": "Item one name",
+          "rate": 100,
+          "quantity": 2,
+          "gstRate": 18,
+          "amount": 200,
+          "total": 236
+        }
+      ],
+      "payments": [],
+      "finalTotal": {
+        "total": 0,
+        "amount": 0,
+        "subTotal": 0,
+        "igst": 0,
+        "cgst": 0,
+        "sgst": 0,
+        "discount": 0
+      },
+      "updatedAt": "2024-08-18T12:08:38.000Z"
+    }
+    ```
+    :::
+
+    :::danger `401: Unauthorized`
+    Invalid authentication.
+
+    ```json
+    {
+      "name": "NotAuthenticated",
+      "message": "Invalid login",
+      "code": 401,
+      "className": "not-authenticated",
+      "data": {
+        "message": "Invalid login"
+      },
+      "errors": {}
+    }
+    ```
+    :::
+
   </TabItem>
 </Tabs>
