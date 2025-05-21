@@ -1,0 +1,94 @@
+# Generate IRN
+
+### Generation of E-Invoices (IRN) for Indian Business Invoices
+
+### Overview
+
+The Invoice Reference Number (IRN) is a unique identifier assigned to invoices, debit notes, and credit notes under the e-Invoicing system within the Goods and Services Tax (GST) framework. This system, facilitated by the Invoice Registration Portal (IRP), ensures streamlined, compliant, and secure invoicing for businesses.
+
+<HttpMethod type='post' /> `/businesses/:urlKey/invoices/:invoice/irn`
+
+This endpoint allows you to generate IRN for an existing refrens invoice.
+
+<Tabs>
+  <TabItem value="request" label="Request">
+    **Path Params**
+
+    `urlKey` - The unique identifier of the business. <br />
+    `invoice` - The invoice ID for which the IRN is to be generated.
+
+    **Query Params**
+
+    | Name                   | Type    | `Value` Description                              |
+    | --------------         | ------- | ----------------------------------------------- |
+    | includePaymentDetails  | boolean | Set to `true` if you want to include the associated payments. |
+
+    **Headers**
+
+    | Name             | Type   | `Value` Description |
+    | ---------------- | ------ | ------------------- |
+    | Content-Type \*  | string | `application-json`  |
+    | Authorization \* | string | `Bearer <jwt>`      |
+
+  </TabItem>
+
+  <TabItem value="response" label="Response">
+    :::success `200: OK`
+    The response will include the details of the e-invoice generated for the specified invoice.
+
+    ```json
+    {
+      "AckNo": "182510010588566",
+      "AckDt": "2025-04-21 01:16:26",
+      "Irn": "b5abd0386b52bd2c30e014609ae6403c87576b01583f7cf1ef25370e7a14a92f",
+      "SignedInvoice": "eyJhbGciOiJSUzI1NiIsImtpZCI6IjNCRTE3RTUxNDE5MjUyMjY0N0YwMUZEQkZGNTI3MUFENTI2OEQ3MzUiLCJ4NXQiOiJPLUYtVVVHU1VpWkg4Ql9iXzFKeHJWSm8xelUiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJOSUMgU2FuZGJveCIsImRhdGEiOiJ7XCJBY2tOb1wiOjE4MjUxMDAxMDU4ODU2NixcIkFja0R0XCI6XCIyMDI1LTA0LTIxIDAxOjE2OjI2XCIsXCJJcm5cIjpcImI1YWJkMDM4NmI1MmJkMmMzMGUwMTQ2MDlhZTY0MDNjODc1NzZiMDE1ODNmN2NmMWVmMjUzNzBlN2ExNGE5MmZcIixcIlZlcnNpb25cIjpcIjEuMVwiLFwiVHJhbkR0bHNcIjp7XCJUYXhTY2hcIjpcIkdTVFwiLFwiU3VwVHlwXCI6XCJCMkJcIixcIlJlZ1JldlwiOlwiTlwiLFwiSWdzdE9uSW50cmFcIjpcIk5cIn0sXCJEb2NEdGxzXCI6e1wiVHlwXCI6XCJJTlZcIixcIk5vXCI6XCJVRzAzMlwiLFwiRHRcIjpcIjE0LzA0LzIwMjVcIn0sXCJTZWxsZXJEdGxzXCI6e1wiR3N0aW5cIjpcIjE5QUFBUEkzMTgyTTAwN1wiLFwiTGdsTm1cIjpcIkhlbGxvRGl2ZS5jb21cIixcIkFkZHIxXCI6XCIjNzY1LCBIaWdoIFN0cmVldFwiLFwiTG9jXCI6XCJXZXN0IEJlbmdhbFwiLFwiUGluXCI6NzAwMDI1LFwiU3RjZFwiOlwiMTlcIixcIlBoXCI6XCI5ODE5NDY1MzY1XCIsXCJFbVwiOlwia2FydGlrXFx1MDAyQjEyQHJlZnJlbnMuY29tXCJ9LFwiQnV5ZXJEdGxzXCI6e1wiR3N0aW5cIjpcIjI5QUFJQ0EzOTE4SjFaRVwiLFwiTGdsTm1cIjpcIkNsaWVudCAyXCIsXCJQb3NcIjpcIjI5XCIsXCJBZGRyMVwiOlwiVGVzdFwiLFwiTG9jXCI6XCJLYXJuYXRha2FcIixcIlBpblwiOjU2MDEwMixcIlBoXCI6XCI5OTk5OTk5OTk5XCIsXCJFbVwiOlwiYmhhbnVzaGFsaW5pZGhpNDRAZ21haWwuY29tXCIsXCJTdGNkXCI6XCIyOVwifSxcIkl0ZW1MaXN0XCI6W3tcIkl0ZW1Ob1wiOjAsXCJTbE5vXCI6XCIxXCIsXCJJc1NlcnZjXCI6XCJOXCIsXCJQcmREZXNjXCI6XCJkc2Rhc2RcIixcIkhzbkNkXCI6XCI4NDE0XCIsXCJRdHlcIjoxOCxcIlVuaXRcIjpcIkRPWlwiLFwiVW5pdFByaWNlXCI6MTAsXCJUb3RBbXRcIjoxODAsXCJEaXNjb3VudFwiOjAsXCJQcmVUYXhWYWxcIjoxODAsXCJBc3NBbXRcIjoxODAsXCJHc3RSdFwiOjE4LFwiSWdzdEFtdFwiOjMyLjQsXCJDZ3N0QW10XCI6MCxcIlNnc3RBbXRcIjowLFwiQ2VzUnRcIjowLFwiQ2VzQW10XCI6MCxcIkNlc05vbkFkdmxBbXRcIjowLFwiU3RhdGVDZXNSdFwiOjAsXCJTdGF0ZUNlc0FtdFwiOjAsXCJTdGF0ZUNlc05vbkFkdmxBbXRcIjowLFwiT3RoQ2hyZ1wiOjAsXCJUb3RJdGVtVmFsXCI6MjEyLjR9LHtcIkl0ZW1Ob1wiOjAsXCJTbE5vXCI6XCIyXCIsXCJJc1NlcnZjXCI6XCJOXCIsXCJQcmREZXNjXCI6XCJkc2Rhc2RcIixcIkhzbkNkXCI6XCI4NDE0XCIsXCJRdHlcIjoxOCxcIlVuaXRcIjpcIk9USFwiLFwiVW5pdFByaWNlXCI6MTAsXCJUb3RBbXRcIjoxODAsXCJEaXNjb3VudFwiOjAsXCJQcmVUYXhWYWxcIjoxODAsXCJBc3NBbXRcIjoxODAsXCJHc3RSdFwiOjE4LFwiSWdzdEFtdFwiOjMyLjQsXCJDZ3N0QW10XCI6MCxcIlNnc3RBbXRcIjowLFwiQ2VzUnRcIjowLFwiQ2VzQW10XCI6MCxcIkNlc05vbkFkdmxBbXRcIjowLFwiU3RhdGVDZXNSdFwiOjAsXCJTdGF0ZUNlc0FtdFwiOjAsXCJTdGF0ZUNlc05vbkFkdmxBbXRcIjowLFwiT3RoQ2hyZ1wiOjAsXCJUb3RJdGVtVmFsXCI6MjEyLjR9XSxcIlZhbER0bHNcIjp7XCJBc3NWYWxcIjozNjAsXCJDZ3N0VmFsXCI6MCxcIlNnc3RWYWxcIjowLFwiSWdzdFZhbFwiOjY0LjgsXCJDZXNWYWxcIjowLFwiU3RDZXNWYWxcIjowLFwiRGlzY291bnRcIjowLFwiT3RoQ2hyZ1wiOjAsXCJSbmRPZmZBbXRcIjowLFwiVG90SW52VmFsXCI6NDI0Ljh9fSJ9.D5b0Fro8wxgWc24TWvdcuTymp61RB5-6WVCTT0eBHJZrxmqqO5WZ-5wY-6xWMDFhm1RKrTa-TTa4PFF7xMkPsshR7-1YUSaUb1Roc5T1O2Jr5kjzRPS6ZJLQzt3JHp_FdvA0Hu7wrB7N6o-Ugr5NorbJoE9ZAyBkE40R5WsAcK5d22eRW6cjOA8U7hc7hmpm--QKdAyvAjmyoBRqyIlda3rq4yO8xEuaCTO5bJXj2AIr3t_axepwsSp3R9jk6vbYI0sqzBsv4czUT_0kRysdjuXJ2oF3RXq9B-p4Z8YEYXaB8gHwNUQ-2BDI7FUjQ4VFCGHGv-De8I47YomsKETZrQ",
+      "SignedQRCode": "eyJhbGciOiJSUzI1NiIsImtpZCI6IjNCRTE3RTUxNDE5MjUyMjY0N0YwMUZEQkZGNTI3MUFENTI2OEQ3MzUiLCJ4NXQiOiJPLUYtVVVHU1VpWkg4Ql9iXzFKeHJWSm8xelUiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJOSUMgU2FuZGJveCIsImRhdGEiOiJ7XCJTZWxsZXJHc3RpblwiOlwiMTlBQUFQSTMxODJNMDA3XCIsXCJCdXllckdzdGluXCI6XCIyOUFBSUNBMzkxOEoxWkVcIixcIkRvY05vXCI6XCJVRzAzMlwiLFwiRG9jVHlwXCI6XCJJTlZcIixcIkRvY0R0XCI6XCIxNC8wNC8yMDI1XCIsXCJUb3RJbnZWYWxcIjo0MjQuOCxcIkl0ZW1DbnRcIjoyLFwiTWFpbkhzbkNvZGVcIjpcIjg0MTRcIixcIklyblwiOlwiYjVhYmQwMzg2YjUyYmQyYzMwZTAxNDYwOWFlNjQwM2M4NzU3NmIwMTU4M2Y3Y2YxZWYyNTM3MGU3YTE0YTkyZlwiLFwiSXJuRHRcIjpcIjIwMjUtMDQtMjEgMDE6MTY6MjZcIn0ifQ.yQuP8IG5Qjc6juwfklMEQtMZkmKGgLPqIARnRWGye0Y-wV9BvBPXs6hfBFm_LcfLec0yrulnLuBbgTa67ngl0b-0CQkEPFy0EfqViVNQb7TtIPUSaIh4k0ewi9ff87R0PiaUqVbsPQdDPBVWb2o32rETzqcdddFeJ1idhBCYpwKqz__HNGE4i9CtMoPSXuip1GNRDyn7z-uT1-ayaeawjwGGSf8S9ADnGQxDFGvM6Jux20TqgPbiS91QwEfFXPP-_DXSp1UUp0bgDUXDUa8nWvGOCamn7OQdkk5geXtsomm0FFcH07T9lcGUzjeQ3QZ3YO14SxAnZq46sDpfBfiGZg",
+      "Status": "ACT",
+      "info": null,
+      "additionalInfo": null,
+      "alert": null,
+      "qr": "{\"SellerGstin\":\"19AAAPI3182M017\",\"BuyerGstin\":\"29AAICA3919L1ZE\",\"DocNo\":\"UG032\",\"DocTyp\":\"INV\",\"DocDt\":\"14/04/2025\",\"TotInvVal\":424.8,\"ItemCnt\":2,\"MainHsnCode\":\"8414\",\"Irn\":\"b5abd0386b52bd2c30e014609ae6403c87576b01583f7cf1ef25370e7a14a92f\",\"IrnDt\":\"2025-04-21 01:16:26\"}",
+      "invoiceNumber": "UG032",
+      "invoiceId": "67fcb537f811496b8721362b"
+    }
+    ```
+
+    :::
+
+    :::danger `401: Unauthorized`
+    Invalid authentication.
+
+    ```json
+    {
+      "name": "NotAuthenticated",
+      "message": "Invalid login",
+      "code": 401,
+      "className": "not-authenticated",
+      "data": {
+        "message": "Invalid login"
+      },
+      "errors": {}
+    }
+    ```
+    :::
+
+    :::danger `400: Bad Request`
+    Error in generating IRN.
+
+    ```json
+    {
+      "errorMessage": {
+        "details": [
+          {
+            "ErrorCode": "2240",
+            "ErrorMessage": "For Sl. No 1, GST rate of tax is incorrect or not as notified"
+          }
+        ]
+      },
+      "errorMessageDate": 1745178346990
+    }
+    ```
+    :::
+
+  </TabItem>
+</Tabs>

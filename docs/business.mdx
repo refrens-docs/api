@@ -1,0 +1,99 @@
+# Business
+
+### Create New Business
+
+<HttpMethod type='post' /> `/businesses`
+
+This endpoint allows you to create a new business entity under current business.
+It returns created business details, including the `urlKey` for creating invoices in the future. <br />
+Use the existing token with the new `urlKey` to create invoices for the new business entity.
+
+<Tabs>
+  <TabItem value="request" label="Request">
+    **Headers**
+
+    | Name             | Type   | `Value` Description |
+    | ---------------- | ------ | ------------------- |
+    | Content-Type \*  | string | `application-json`  |
+    | Authorization \* | string | `Bearer <jwt>`      |
+
+    **Body**
+
+    | Name              | Type          | `Value` Description                                                                 |
+    | ----------------- | ------------- | ----------------------------------------------------------------------------------- |
+    | name \*           | string        | Name of the business                                                               |
+    | country \*        | string        | Country code (e.g., "IN" for India)                                                |
+    | gstin             | string        | GST Identification Number                                                          |
+    | **billedTo**      | object        | Billing information                                                                |
+    | billedTo.name     | string        | Name for billing                                                                   |
+    | billedTo.phone    | string        | Phone number                                                                       |
+    | billedTo.email    | string        | Email address                                                                      |
+    | billedTo.country  | string        | Country code                                                                       |
+    | billedTo.gstState | string        | GST state code                                                                     |
+    | billedTo.pincode  | string        | Postal code                                                                        |
+    | billedTo.city     | string        | City name                                                                          |
+    | billedTo.street   | string        | Street address                                                                     |
+    | billedTo.gstin    | string        | GST Identification Number                                                          |
+    | **auth**          | object        | Authentication information                                                         |
+    | auth.email \*     | array[string] | List of users to add in the business                                         |
+
+  </TabItem>
+
+  <TabItem value="response" label="Response">
+    :::success `200: OK`
+    Successful creation of a business entity.
+
+    ```json #
+    {
+      "_id": "60cc8cc6aa3024abd4bef447",
+      "name": "Business Name",
+      "country": "IN",
+      "gstin": "29ABCDE1234F2Z5",
+      "urlKey": "business-url-key",
+      "country": "IN",
+      "currency": "IN",
+      "billedTo": {
+        "name": "Billing Name",
+        "phone": "+91 9876543210",
+        "email": "billing@example.com",
+        "country": "IN",
+        "gstState": "29",
+        "pincode": "560100",
+        "city": "Bangalore",
+        "street": "Street Address",
+        "gstin": "29ABCDE1234F2Z5"
+      },
+      "users": [
+        {
+            "name": "John Doe",
+            "email": "doejohn04@gmail.com",
+            "_id": "65ae751d8d476d33b879162d"
+        }
+    ],
+      "createdAt": "2024-08-18T12:08:38.000Z",
+      "updatedAt": "2024-08-18T12:08:38.000Z"
+    }
+    ```
+
+    :::
+
+    :::danger `401: Unauthorized`
+    Invalid authentication.
+
+    ```json #
+    {
+      "name": "NotAuthenticated",
+      "message": "Invalid login",
+      "code": 401,
+      "className": "not-authenticated",
+      "data": {
+        "message": "Invalid login"
+      },
+      "errors": {}
+    }
+    ```
+
+    :::
+
+  </TabItem>
+</Tabs>

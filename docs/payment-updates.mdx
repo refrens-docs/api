@@ -1,0 +1,147 @@
+# Payment Updates in Invoices
+
+### Add Payment to Invoice
+
+<HttpMethod type='post' /> `/businesses/:urlKey/invoices/:invoice/payments`
+
+This endpoint allows the you to add a payment to a specific invoice for a business.
+
+<Tabs>
+  <TabItem value="request" label="Request">
+    **Path Params**
+
+    `urlKey` - will be provided by us<br />
+    `invoice` - unique ID of the invoice.
+
+    **Headers**
+
+    | Name             | Type   | `Value` Description |
+    | ---------------- | ------ | ------------------- |
+    | Content-Type \*  | string | `application-json`  |
+    | Authorization \* | string | `Bearer <jwt>`      |
+
+    **Body**
+
+    | Name              | Type          | `Value` Description                                                                 |
+    | ----------------- | ------------- | ----------------------------------------------------------------------------------- |
+    | tds               | number        | The TDS (Tax Deducted at Source) amount for the payment.                            |
+    | transactionCharge | number        | The transaction charge for the payment.                                            |
+    | amount            | number        | The amount of the payment.                                                         |
+    | paymentDate       | string        | The date of the payment.                                                           |
+    | paymentMethod     | string (enum) | The method used for the payment: <br /> `ACCOUNT_TRANSFER` -> Account Transfer<br /> `CASH` -> Cash<br /> `CHEQUE` -> Cheque<br /> `CREDIT_CARD` -> Credit Card<br /> `DEBIT_CARD` -> Debit Card<br /> `DD` -> Demand Draft<br /> `UPI` -> UPI<br />.         |
+    | notes             | string        | Any additional notes for the payment.                                              |
+    | refId             | string        | Reference ID for the payment.                                                      |
+
+  </TabItem>
+
+  <TabItem value="response" label="Response">
+    :::success `201: Created`
+    Payment successfully added.
+
+    ```json
+    {
+      "tds": 0,
+      "transactionCharge": 0,
+      "amount": 3000,
+      "paymentDate": "2024-08-18T12:08:38.000Z",
+      "paymentMethod": "CHEQUE",
+      "notes": "Payment for invoice #123",
+      "business": "60cc8cc6aa3024abd4bef997",
+      "payerBusiness": "60aa8hf6aa3024abd4bef447",
+      "isApproved": true,
+      "isRemoved": false,
+      "appId": "60cc8cc6aa3024abd4bej98k",
+      "_id": "60cc8cc6ps9024abd4bej98k"
+    }
+    ```
+    :::
+
+    :::danger `401: Unauthorized`
+    Invalid authentication.
+
+    ```json
+    {
+      "name": "NotAuthenticated",
+      "message": "Invalid login",
+      "code": 401,
+      "className": "not-authenticated",
+      "data": {
+        "message": "Invalid login"
+      },
+      "errors": {}
+    }
+    ```
+    :::
+
+  </TabItem>
+</Tabs>
+
+---
+
+### Get Payments on Invoice
+
+<HttpMethod type='get' /> `/businesses/:urlKey/invoices/:invoice/payments`
+
+This endpoint retrieves the payments associated with a specific invoice for a business.
+
+<Tabs>
+  <TabItem value="request" label="Request">
+    **Path Params**
+
+    `urlKey` - The unique identifier of the business.<br/>
+    `invoice` - The invoice ID for which the payments are being retrieved.
+
+    **Headers**
+
+    | Name             | Type   | `Value` Description |
+    | ---------------- | ------ | ------------------- |
+    | Content-Type \*  | string | `application-json`  |
+    | Authorization \* | string | `Bearer <jwt>`      |
+
+  </TabItem>
+
+  <TabItem value="response" label="Response">
+    :::success `200: OK`
+    The response will include the details of the payments made towards the specified invoice.
+
+    ```json
+    {
+      "payments": [
+        {
+          "tds": 0,
+          "transactionCharge": 0,
+          "amount": 1000,
+          "paymentDate": "2023-10-01",
+          "paymentMethod": "CREDIT_CARD",
+          "notes": "Payment for invoice #123",
+          "business": "60cc8cc6aa3024abd4bef997",
+          "payerBusiness": "60aa8hf6aa3024abd4bef447",
+          "isApproved": true,
+          "isRemoved": false,
+          "appId": "60cc8cc6aa3024abd4bej98k",
+          "_id": "60cc8cc6ps9024abd4bej98k"
+        }
+      ]
+    }
+    ```
+    :::
+
+    :::danger `401: Unauthorized`
+    Invalid authentication.
+
+    ```json
+    {
+      "name": "NotAuthenticated",
+      "message": "Invalid login",
+      "code": 401,
+      "className": "not-authenticated",
+      "data": {
+        "message": "Invalid login"
+      },
+      "errors": {}
+    }
+    ```
+    :::
+
+  </TabItem>
+</Tabs>
