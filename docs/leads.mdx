@@ -1,0 +1,237 @@
+---
+sidebar_position: 8
+---
+
+# Leads
+
+Push leads into a Refrens CRM business from an external system. The endpoint is **idempotent** on a caller-supplied `externalId`, so a safe retry never creates a duplicate lead.
+
+:::info Authentication
+Like every Refrens API endpoint, the Leads API is authorised with an **app token** sent as `Authorization: Bearer <jwt>`. You can obtain the token in either of two ways:
+
+- Call [Create Token](./authentication.mdx) with `strategy: app-secret`, or
+- [Self-sign](./authentication.mdx#self-signed-tokens) a token with your private key (`strategy: app-iss-app-token`).
+
+The calling app must be attached to the business in the path, otherwise the request is rejected with `403 PERMISSION_DENIED`.
+:::
+
+### Create New Lead
+
+<HttpMethod type='post' /> `/api/v1/businesses/:urlKey/leads`
+
+Creates a lead in the given business. The `customer` and `contact` blocks are either matched to an existing client/contact by id, or created new when only a `name` is supplied. `pipeline`, `stage`, `leadSource` and `tags` are resolved **by name** against the business's existing CRM configuration — they are never auto-created.
+
+<Tabs>
+  <TabItem value="request" label="Request">
+    **Path Params**
+
+    `urlKey` - will be provided by us
+
+    **Headers**
+
+    | Name             | Type   | `Value` Description |
+    | ---------------- | ------ | ------------------- |
+    | Content-Type \*  | string | `application-json`  |
+    | Authorization \* | string | `Bearer <jwt>`      |
+
+    **Body**
+
+    | Name                     | Type          | `Value` Description                                                                                                                                                             |
+    | ------------------------ | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+    | externalId \*            | string        | Idempotency key for this lead. Must be unique per business and ≤ 128 characters. Re-sending the same `externalId` returns the existing lead instead of creating a duplicate.   |
+    | **customer** \*          | object        | The client this lead is for. Provide `clientId` **or** `name`.                                                                                                                 |
+    | customer.clientId        | string        | Existing client id (the `customer.clientId` returned by a previous call). Use this to attach the lead to a known client.                                                       |
+    | customer.name            | string        | Client name. When `clientId` is absent or does not resolve, a **new client is created** with these details.                                                                    |
+    | customer.country         | string        | [`ISO 3166-1 alpha-2`](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2) country code. Defaults to `IN`.                                                                       |
+    | customer.phone           | string        | Customer phone. Stored on the lead snapshot; never patched onto an existing client record.                                                                                     |
+    | customer.address / city / state / pincode | string | Optional customer address fields. Stored on the lead snapshot only.                                                                                                   |
+    | **contact** \*           | object        | The point of contact for this lead. Provide `contactId` **or** `name`. Same resolution rules as `customer`.                                                                    |
+    | contact.contactId        | string        | Existing contact id (the `contact.contactId` returned by a previous call).                                                                                                     |
+    | contact.name             | string        | Contact name. When `contactId` is absent or does not resolve, a **new contact is created**.                                                                                    |
+    | contact.email            | string        | Contact email. Stored on the lead snapshot.                                                                                                                                    |
+    | contact.phone            | string        | Contact phone. Stored on the lead snapshot.                                                                                                                                    |
+    | contact.country          | string        | ISO country code written to the new contact record when one is created. Defaults to `IN`.                                                                                      |
+    | contact.designation      | string        | Contact designation. Stored on the lead snapshot.                                                                                                                              |
+    | subject                  | string        | Short subject / title for the lead.                                                                                                                                            |
+    | details                  | string        | Free-text details / notes for the lead.                                                                                                                                        |
+    | **budget**               | object        | Deal budget.                                                                                                                                                                   |
+    | budget.amount            | number        | Budget amount.                                                                                                                                                                 |
+    | budget.currency          | string        | [`ISO 4217`](https://en.wikipedia.org/wiki/ISO_4217) currency code.                                                                                                            |
+    | leadSource               | string        | Lead source — either the admin-source `key` or its exact label (e.g. `Other`). Must already exist and be non-archived in the business.                                          |
+    | pipeline \*              | string        | Pipeline **name** (not id). Must be a live, non-archived pipeline in the business.                                                                                             |
+    | stage \*                 | string        | Stage **name** (not id). Must belong to the resolved `pipeline` and be non-archived.                                                                                           |
+    | assignedTo               | string        | Email of the user to assign the lead to. Must already be a member of the business — the API never sends invites.                                                              |
+    | tags                     | array[string] | Tag **names**. Every tag must already exist and be non-archived. Never creates tags.                                                                                          |
+    | customFields             | object         | Custom field values keyed by the field's display name, e.g. `{ "Industry": "SaaS" }`. Each name must map to a non-archived Leads custom field. Requires custom fields to be enabled for the business. |
+
+    Any top-level field not in this list is rejected with `400 INVALID_FIELD`. System fields such as `source` are always stamped by the server (`source: "API"`).
+
+    **Sample Body**
+
+    ```json
+    {
+      "externalId": "crm-import-8842",
+      "customer": {
+        "name": "Acme Corp",
+        "country": "IN",
+        "phone": "+91 97394 32668"
+      },
+      "contact": {
+        "name": "Jane Doe",
+        "email": "jane@acme.example",
+        "country": "IN"
+      },
+      "subject": "Website enquiry - annual plan",
+      "details": "Requested a quote for the annual plan.",
+      "pipeline": "Sales Pipeline",
+      "stage": "Contacted",
+      "leadSource": "Other",
+      "budget": {
+        "amount": 12345,
+        "currency": "INR"
+      },
+      "assignedTo": "sam@refrens.com",
+      "tags": []
+    }
+    ```
+
+  </TabItem>
+
+  <TabItem value="response" label="Response">
+    :::success `201: Created`
+    Lead created successfully. On an idempotent retry (same `externalId`, same details) the same document is returned with an additional `"idempotent": true` flag.
+
+    ```json #
+    {
+      "success": true,
+      "data": {
+        "leadId": "6a42668216abb5022452276a",
+        "externalId": "crm-import-8842",
+        "customer": {
+          "clientId": "1782736514001",
+          "name": "Acme Corp",
+          "country": "IN",
+          "phone": "+91 97394 32668"
+        },
+        "contact": {
+          "contactId": "Jane Doe-1782736514001",
+          "name": "Jane Doe",
+          "email": "jane@acme.example",
+          "phone": ""
+        },
+        "subject": "Website enquiry - annual plan",
+        "details": "Requested a quote for the annual plan.",
+        "budget": {
+          "amount": 12345,
+          "currency": "INR"
+        },
+        "leadSource": "OTHER",
+        "pipeline": "Sales Pipeline",
+        "stage": "Contacted",
+        "stageReason": [],
+        "assignedTo": "sam@refrens.com",
+        "tags": [],
+        "source": "API",
+        "createdAt": "2026-06-29T12:35:14.096Z",
+        "updatedAt": "2026-06-29T12:35:14.096Z"
+      }
+    }
+    ```
+
+    :::
+    :::danger `400: Bad Request`
+    Validation failed. The `error.code` identifies the exact reason (see the table below).
+
+    ```json #
+    {
+      "name": "BadRequest",
+      "message": "pipeline is required",
+      "code": 400,
+      "className": "bad-request",
+      "data": {
+        "success": false,
+        "error": {
+          "message": "pipeline is required",
+          "code": "INVALID_PIPELINE",
+          "status": 400
+        }
+      },
+      "errors": {}
+    }
+    ```
+
+    :::
+    :::danger `409: Conflict`
+    A lead with the same `externalId` already exists but the payload differs materially. Use the existing lead (`existingLeadId`) instead of re-creating it.
+
+    ```json #
+    {
+      "name": "BadRequest",
+      "message": "A lead with this externalId already exists with different details",
+      "code": 409,
+      "className": "bad-request",
+      "data": {
+        "success": false,
+        "error": {
+          "message": "A lead with this externalId already exists with different details",
+          "code": "IDEMPOTENCY_CONFLICT",
+          "status": 409,
+          "existingLeadId": "6a42668216abb5022452276a"
+        }
+      },
+      "errors": {}
+    }
+    ```
+
+    :::
+    :::danger `401: Unauthorized`
+    Missing or invalid app token.
+
+    ```json #
+    {
+      "name": "NotAuthenticated",
+      "message": "Invalid login",
+      "code": 401,
+      "className": "not-authenticated",
+      "data": {
+        "message": "Invalid login"
+      },
+      "errors": {}
+    }
+    ```
+
+    :::
+
+  </TabItem>
+</Tabs>
+
+#### Idempotency
+
+`externalId` makes the create safe to retry:
+
+| Case                                              | Response                                                        |
+| ------------------------------------------------- | -------------------------------------------------------------- |
+| New `externalId`                                  | `201` + the full lead document.                                |
+| Same `externalId`, same details                   | `201` + the full lead document with `"idempotent": true`.      |
+| Same `externalId`, materially different details   | `409 IDEMPOTENCY_CONFLICT` (includes the `existingLeadId`).    |
+
+#### Error codes
+
+| `error.code`          | Status | When                                                                       |
+| --------------------- | ------ | -------------------------------------------------------------------------- |
+| `INVALID_FIELD`       | 400    | Unknown top-level field in the body.                                       |
+| `EXTERNAL_ID_REQUIRED`| 400    | `externalId` missing, empty, or longer than 128 characters.                |
+| `INVALID_CUSTOMER`    | 400    | `customer` block missing or has neither `clientId` nor `name`.             |
+| `INVALID_CONTACT`     | 400    | `contact` block missing or has neither `contactId` nor `name`.             |
+| `CLIENT_NOT_FOUND`    | 400    | `customer.clientId` did not resolve and no `name` was supplied to fall back on. |
+| `CONTACT_NOT_FOUND`   | 400    | `contact.contactId` did not resolve and no `name` was supplied.            |
+| `INVALID_PIPELINE`    | 400    | `pipeline` missing, unknown, or archived.                                  |
+| `INVALID_STAGE`       | 400    | `stage` missing, unknown, archived, or not part of the given pipeline.     |
+| `INVALID_LEAD_SOURCE` | 400    | `leadSource` unknown or archived.                                          |
+| `INVALID_TAG`         | 400    | One or more `tags` are unknown or archived.                                |
+| `INVALID_ASSIGNEE`    | 400    | `assignedTo` email is not a member of the business.                        |
+| `INVALID_CUSTOM_FIELD` / `INVALID_CUSTOM_FIELD_VALUE` | 400 | A custom field name or value is invalid.                    |
+| `CUSTOM_FIELDS_NOT_ENABLED` | 400 | The business has not enabled custom fields.                            |
+| `PERMISSION_DENIED`   | 403    | The calling app is not attached to this business.                          |
+| `IDEMPOTENCY_CONFLICT`| 409    | Same `externalId` with different details.                                  |
+| `SERVICE_ERROR`       | 500    | Unexpected server error.                                                   |
