@@ -4,7 +4,9 @@ sidebar_position: 8
 
 # Leads
 
-Push leads into a Refrens CRM business from an external system. The endpoint is **idempotent** on a caller-supplied `externalId`, so a safe retry never creates a duplicate lead.
+Create and update leads in a Refrens CRM business from an external system. Lead creation is
+**idempotent** on a caller-supplied `externalId`, while lead updates use the `leadId` returned by
+the create response.
 
 :::info Authentication
 Like every Refrens API endpoint, the Leads API is authorised with an **app token** sent as `Authorization: Bearer <jwt>`. You can obtain the token in either of two ways:
@@ -126,9 +128,10 @@ Creates a lead in the given business. The `customer` and `contact` blocks are ei
           "currency": "INR"
         },
         "leadSource": "OTHER",
+        "followUpDate": null,
         "pipeline": "Sales Pipeline",
         "stage": "Contacted",
-        "stageReason": [],
+        "stageReasons": [],
         "assignedTo": "sam@refrens.com",
         "tags": [],
         "source": "API",
@@ -209,29 +212,293 @@ Creates a lead in the given business. The `customer` and `contact` blocks are ei
 
 `externalId` makes the create safe to retry:
 
-| Case                                              | Response                                                        |
-| ------------------------------------------------- | -------------------------------------------------------------- |
-| New `externalId`                                  | `201` + the full lead document.                                |
-| Same `externalId`, same details                   | `201` + the full lead document with `"idempotent": true`.      |
-| Same `externalId`, materially different details   | `409 IDEMPOTENCY_CONFLICT` (includes the `existingLeadId`).    |
+| Case                                            | Response                                                    |
+| ----------------------------------------------- | ----------------------------------------------------------- |
+| New `externalId`                                | `201` + the full lead document.                             |
+| Same `externalId`, same details                 | `201` + the full lead document with `"idempotent": true`.   |
+| Same `externalId`, materially different details | `409 IDEMPOTENCY_CONFLICT` (includes the `existingLeadId`). |
 
 #### Error codes
 
-| `error.code`          | Status | When                                                                       |
-| --------------------- | ------ | -------------------------------------------------------------------------- |
-| `INVALID_FIELD`       | 400    | Unknown top-level field in the body.                                       |
-| `EXTERNAL_ID_REQUIRED`| 400    | `externalId` missing, empty, or longer than 128 characters.                |
-| `INVALID_CUSTOMER`    | 400    | `customer` block missing or has neither `clientId` nor `name`.             |
-| `INVALID_CONTACT`     | 400    | `contact` block missing or has neither `contactId` nor `name`.             |
-| `CLIENT_NOT_FOUND`    | 400    | `customer.clientId` did not resolve and no `name` was supplied to fall back on. |
-| `CONTACT_NOT_FOUND`   | 400    | `contact.contactId` did not resolve and no `name` was supplied.            |
-| `INVALID_PIPELINE`    | 400    | `pipeline` missing, unknown, or archived.                                  |
-| `INVALID_STAGE`       | 400    | `stage` missing, unknown, archived, or not part of the given pipeline.     |
-| `INVALID_LEAD_SOURCE` | 400    | `leadSource` unknown or archived.                                          |
-| `INVALID_TAG`         | 400    | One or more `tags` are unknown or archived.                                |
-| `INVALID_ASSIGNEE`    | 400    | `assignedTo` email is not a member of the business.                        |
-| `INVALID_CUSTOM_FIELD` / `INVALID_CUSTOM_FIELD_VALUE` | 400 | A custom field name or value is invalid.                    |
-| `CUSTOM_FIELDS_NOT_ENABLED` | 400 | The business has not enabled custom fields.                            |
-| `PERMISSION_DENIED`   | 403    | The calling app is not attached to this business.                          |
-| `IDEMPOTENCY_CONFLICT`| 409    | Same `externalId` with different details.                                  |
-| `SERVICE_ERROR`       | 500    | Unexpected server error.                                                   |
+| `error.code`                                          | Status | When                                                                            |
+| ----------------------------------------------------- | ------ | ------------------------------------------------------------------------------- |
+| `INVALID_FIELD`                                       | 400    | Unknown top-level field in the body.                                            |
+| `EXTERNAL_ID_REQUIRED`                                | 400    | `externalId` missing, empty, or longer than 128 characters.                     |
+| `INVALID_CUSTOMER`                                    | 400    | `customer` block missing or has neither `clientId` nor `name`.                  |
+| `INVALID_CONTACT`                                     | 400    | `contact` block missing or has neither `contactId` nor `name`.                  |
+| `CLIENT_NOT_FOUND`                                    | 400    | `customer.clientId` did not resolve and no `name` was supplied to fall back on. |
+| `CONTACT_NOT_FOUND`                                   | 400    | `contact.contactId` did not resolve and no `name` was supplied.                 |
+| `INVALID_PIPELINE`                                    | 400    | `pipeline` missing, unknown, or archived.                                       |
+| `INVALID_STAGE`                                       | 400    | `stage` missing, unknown, archived, or not part of the given pipeline.          |
+| `INVALID_LEAD_SOURCE`                                 | 400    | `leadSource` unknown or archived.                                               |
+| `INVALID_TAG`                                         | 400    | One or more `tags` are unknown or archived.                                     |
+| `INVALID_ASSIGNEE`                                    | 400    | `assignedTo` email is not a member of the business.                             |
+| `INVALID_CUSTOM_FIELD` / `INVALID_CUSTOM_FIELD_VALUE` | 400    | A custom field name or value is invalid.                                        |
+| `CUSTOM_FIELDS_NOT_ENABLED`                           | 400    | The business has not enabled custom fields.                                     |
+| `PERMISSION_DENIED`                                   | 403    | The calling app is not attached to this business.                               |
+| `IDEMPOTENCY_CONFLICT`                                | 409    | Same `externalId` with different details.                                       |
+| `SERVICE_ERROR`                                       | 500    | Unexpected server error.                                                        |
+
+---
+
+### Edit Existing Lead
+
+<HttpMethod type='patch' /> `/api/v1/businesses/:urlKey/leads/:leadId`
+
+Updates an existing lead in the given business. PATCH is partial: only fields present in the
+request are touched, while omitted fields remain unchanged. The response contains the complete
+updated lead in the same external shape as Create Lead.
+
+`externalId` cannot be changed after creation and is rejected on PATCH with `400 INVALID_FIELD`.
+
+<Tabs>
+  <TabItem value="request" label="Request">
+    **Path Params**
+
+    | Name      | Description                                                                                         |
+    | --------- | --------------------------------------------------------------------------------------------------- |
+    | `urlKey`  | The business urlKey provided by Refrens.                                                              |
+    | `leadId`  | The lead id returned as `data.leadId` by Create Lead. This is the only internal id accepted here.   |
+
+    **Headers**
+
+    | Name             | Type   | `Value` Description |
+    | ---------------- | ------ | ------------------- |
+    | Content-Type \*  | string | `application/json`  |
+    | Authorization \* | string | `Bearer <jwt>`      |
+
+    **Body**
+
+    | Name                                   | Type                     | `Value` Description                                                                                                                                                              |
+    | -------------------------------------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+    | subject                                | string                   | Replaces the lead subject. Maximum 2,500 characters.                                                                                                                            |
+    | details                                | string                   | Replaces the lead details. Maximum 10,000 characters.                                                                                                                           |
+    | **budget**                             | object                   | Replaces the supplied budget values.                                                                                                                                            |
+    | budget.amount                          | number                   | Must be greater than zero.                                                                                                                                                       |
+    | budget.currency                        | string                   | [`ISO 4217`](https://en.wikipedia.org/wiki/ISO_4217) currency code.                                                                                                             |
+    | followUpDate                           | string / null            | ISO date that must not be before today. Send `null` to clear it.                                                                                                                |
+    | leadSource                             | string                   | Existing lead-source key or exact label. Never creates a new lead source.                                                                                                      |
+    | assignedTo                             | string / null            | Existing business user's email. Send `null` to unassign the lead.                                                                                                              |
+    | pipeline                               | string                   | Pipeline name. When supplied, `stage` is required in the same request.                                                                                                         |
+    | stage                                  | string                   | Stage name. Without `pipeline`, moves the lead within its current pipeline.                                                                                                    |
+    | stageReasons                           | array[string]            | Reason labels allowed on the resolved stage. Replaces the current set; send `[]` to clear.                                                                                     |
+    | tags                                   | array[string]            | Full replacement of tag names; send `[]` to clear. Cannot be combined with `tagsAdd` or `tagsRemove`.                                                                          |
+    | tagsAdd                                | array[string]            | Adds existing tag names without replacing other tags.                                                                                                                          |
+    | tagsRemove                             | array[string]            | Removes tag names without replacing other tags.                                                                                                                                |
+    | customFields                           | object                   | Values keyed by custom-field display name. Send a field value as `null` to clear only that field.                                                                              |
+    | **customer**                           | object                   | Updates or relinks the customer snapshot. Editable only while the lead is `OPEN`.                                                                                              |
+    | customer.clientId                     | string                   | Existing API-facing client id. Unknown ids return `CLIENT_NOT_FOUND`; PATCH never creates a client as fallback.                                                                |
+    | customer.name / address / city / state / country / pincode / phone | string / null | Snapshot fields. Without `clientId`, updates the snapshot without changing the link. Send an individual field as `null` to clear it.                         |
+    | **contact**                            | object                   | Updates or relinks the contact snapshot. Editable only while the lead is `OPEN`.                                                                                               |
+    | contact.contactId                     | string                   | Existing API-facing contact id. Unknown ids return `CONTACT_NOT_FOUND`; PATCH never creates a contact as fallback.                                                             |
+    | contact.name / email / phone / designation / country | string / null | Snapshot fields. Without `contactId`, updates the snapshot without changing the link. Send an individual field as `null` to clear it.                                      |
+    | **addComments**                        | object                   | Appends public comments to the lead.                                                                                                                                            |
+    | addComments.body                       | array[string]            | Non-empty array. Each entry becomes one comment and must be 500 characters or fewer.                                                                                           |
+    | addComments.clientRequestId            | string                   | Optional retry key for the whole batch, maximum 128 characters. Reusing it skips duplicate comments.                                                                          |
+    | **addInternalNotes**                   | object                   | Same shape as `addComments`, but notes are visible only to the business.                                                                                                       |
+
+    Any unknown top-level field, an empty body, `pipeline` without `stage`, or `tags` combined
+    with `tagsAdd`/`tagsRemove` is rejected with `400 INVALID_FIELD`.
+
+    **Sample Body**
+
+    ```json
+    {
+      "subject": "Website enquiry - annual plan (qualified)",
+      "followUpDate": "2026-08-15",
+      "assignedTo": "sam@refrens.com",
+      "stage": "Qualified",
+      "stageReasons": ["Budget confirmed"],
+      "tagsAdd": ["Hot"],
+      "tagsRemove": ["Cold"],
+      "addComments": {
+        "body": ["Customer confirmed the annual-plan budget."],
+        "clientRequestId": "crm-sync-8842-3"
+      }
+    }
+    ```
+
+  </TabItem>
+
+  <TabItem value="response" label="Response">
+    :::success `200: OK`
+    Lead updated successfully. The full updated lead is returned. PATCH responses never include
+    the create-only `idempotent` flag.
+
+    ```json #
+    {
+      "success": true,
+      "data": {
+        "leadId": "6a42668216abb5022452276a",
+        "externalId": "crm-import-8842",
+        "customer": {
+          "clientId": "1782736514001",
+          "name": "Acme Corp",
+          "country": "IN",
+          "phone": "+91 97394 32668"
+        },
+        "contact": {
+          "contactId": "Jane Doe-1782736514001",
+          "name": "Jane Doe",
+          "email": "jane@acme.example",
+          "phone": ""
+        },
+        "subject": "Website enquiry - annual plan (qualified)",
+        "details": "Requested a quote for the annual plan.",
+        "budget": {
+          "amount": 12345,
+          "currency": "INR"
+        },
+        "leadSource": "OTHER",
+        "followUpDate": "2026-08-15T00:00:00.000Z",
+        "pipeline": "Sales Pipeline",
+        "stage": "Qualified",
+        "stageReasons": ["Budget confirmed"],
+        "assignedTo": "sam@refrens.com",
+        "tags": ["Hot"],
+        "source": "API",
+        "createdAt": "2026-06-29T12:35:14.096Z",
+        "updatedAt": "2026-07-10T05:38:53.345Z"
+      }
+    }
+    ```
+
+    :::
+    :::danger `400: Bad Request`
+    The request contract or one of the supplied values is invalid. When multiple fields fail,
+    `data.error.errors` contains every collected field error.
+
+    ```json #
+    {
+      "name": "BadRequest",
+      "message": "tags must be an array of non-empty strings",
+      "code": 400,
+      "className": "bad-request",
+      "data": {
+        "success": false,
+        "error": {
+          "message": "tags must be an array of non-empty strings",
+          "code": "INVALID_FIELD",
+          "status": 400,
+          "errors": [
+            {
+              "field": "tags",
+              "message": "tags must be an array of non-empty strings",
+              "code": "INVALID_FIELD"
+            }
+          ]
+        }
+      },
+      "errors": {}
+    }
+    ```
+
+    :::
+    :::danger `404: Not Found`
+    The lead does not exist in this business, is removed, or belongs to another business. These
+    cases intentionally return the same response so the API does not reveal lead existence across
+    businesses.
+
+    ```json #
+    {
+      "name": "NotFound",
+      "message": "Lead not found",
+      "code": 404,
+      "className": "not-found",
+      "data": {
+        "success": false,
+        "error": {
+          "message": "Lead not found",
+          "code": "LEAD_NOT_FOUND",
+          "status": 404
+        }
+      },
+      "errors": {}
+    }
+    ```
+
+    :::
+
+  </TabItem>
+</Tabs>
+
+#### Partial update rules
+
+- Omitted fields are not changed.
+- `followUpDate` and `assignedTo` accept `null` to clear the value.
+- Individual customer, contact, and custom-field values accept `null` to clear only that value.
+- An empty body is rejected. A valid request that resolves to no actual change returns the current
+  lead without creating unnecessary change-history entries.
+- `externalId` is create-only and cannot be edited.
+
+#### Pipeline, stage, and stage reasons
+
+| Request                                    | Behavior                                                   |
+| ------------------------------------------ | ---------------------------------------------------------- |
+| `stage` only                               | Moves within the lead's current pipeline.                  |
+| `pipeline` and `stage`                     | Moves to the named stage in the named pipeline.            |
+| `pipeline` without `stage`                 | Returns `400 INVALID_FIELD`.                               |
+| `stageReasons` supplied                    | Replaces reasons with labels valid for the resolved stage. |
+| Stage changed and `stageReasons` omitted   | Clears old stage-scoped reasons.                           |
+| Stage unchanged and `stageReasons` omitted | Preserves the current reasons.                             |
+
+The lead's lifecycle status is derived from the destination stage automatically. Stage, pipeline,
+and reason changes also add an API-authored internal activity note.
+
+#### Tags: replace or update selectively
+
+| Mode    | Fields                        | Behavior                                                         |
+| ------- | ----------------------------- | ---------------------------------------------------------------- |
+| Replace | `tags`                        | The supplied array becomes the complete tag set.                 |
+| Delta   | `tagsAdd` and/or `tagsRemove` | Adds and removes names while preserving all other existing tags. |
+
+All tag names must already exist and be non-archived. The two modes cannot be combined in one
+request.
+
+#### Customer and contact updates
+
+Customer and contact snapshots can be changed only while the lead is `OPEN`, or while the same
+request moves the lead to an `OPEN` stage.
+
+| Input                                  | Behavior                                                                            |
+| -------------------------------------- | ----------------------------------------------------------------------------------- |
+| Existing `clientId` / `contactId` only | Relinks the lead and fills the snapshot from that record.                           |
+| Existing id plus snapshot fields       | Relinks the lead; caller-supplied snapshot fields override values from the record.  |
+| Snapshot fields without an id          | Updates only the lead snapshot; the existing link is preserved.                     |
+| Unknown id                             | Returns `CLIENT_NOT_FOUND` / `CONTACT_NOT_FOUND`. No record is created as fallback. |
+| Empty object                           | Leaves that block unchanged.                                                        |
+
+These changes never modify the linked client or contact record itself.
+
+#### Retry-safe comments and internal notes
+
+`addComments` creates comments visible to all parties on the lead. `addInternalNotes` creates
+business-only notes. Each string in `body` becomes a separate activity entry and is shown as
+API-authored in Refrens.
+
+`clientRequestId` is optional. When supplied, it applies to the whole batch and makes retries safe:
+repeating the request with the same id does not append duplicate entries. PATCH returns the normal
+updated lead; it does not add an `idempotent` flag.
+
+#### PATCH error codes
+
+| `error.code`                    | Status | When                                                                                          |
+| ------------------------------- | ------ | --------------------------------------------------------------------------------------------- |
+| `INVALID_FIELD`                 | 400    | Unknown or malformed field, empty body, conflicting tag modes, or `pipeline` without `stage`. |
+| `INVALID_ASSIGNEE`              | 400    | `assignedTo` email is not a member of the business.                                           |
+| `INVALID_TAG`                   | 400    | One or more tag names are unknown or archived.                                                |
+| `INVALID_LEAD_SOURCE`           | 400    | `leadSource` is unknown or archived.                                                          |
+| `INVALID_PIPELINE`              | 400    | Pipeline is unknown or archived.                                                              |
+| `INVALID_STAGE`                 | 400    | Stage is unknown, archived, or does not belong to the resolved pipeline.                      |
+| `INVALID_STAGE_REASON`          | 400    | A reason is unknown, archived, or unavailable on the resolved stage.                          |
+| `INVALID_CUSTOM_FIELD`          | 400    | A custom field name is unknown or archived.                                                   |
+| `INVALID_CUSTOM_FIELD_VALUE`    | 400    | A custom field value does not match the configured field type.                                |
+| `CUSTOM_FIELDS_NOT_ENABLED`     | 400    | The business has not enabled custom fields.                                                   |
+| `CLIENT_NOT_FOUND`              | 400    | `customer.clientId` does not resolve.                                                         |
+| `CONTACT_NOT_FOUND`             | 400    | `contact.contactId` does not resolve.                                                         |
+| `CUSTOMER_CONTACT_NOT_EDITABLE` | 400    | Customer or contact data was supplied while the lead is not `OPEN`.                           |
+| `PERMISSION_DENIED`             | 403    | The calling app is not attached to this business.                                             |
+| `LEAD_NOT_FOUND`                | 404    | Lead is missing, belongs to another business, or is removed.                                  |
+| `SERVICE_ERROR`                 | 500    | Unexpected server error.                                                                      |
+
+`EXTERNAL_ID_REQUIRED` and `IDEMPOTENCY_CONFLICT` are create-only and are never returned by PATCH.
