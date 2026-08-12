@@ -1,0 +1,683 @@
+---
+sidebar_position: 9
+---
+
+# Clients
+
+Create a client in a Refrens business, then get it using `clientId` — your own customer reference,
+which you choose.
+
+:::info Authentication
+Like every Refrens API endpoint, the Clients API is authorised with an **app token** sent as `Authorization: Bearer <jwt>`. You can obtain the token in either of two ways:
+
+- Call [Create Token](./authentication.mdx) with `strategy: app-secret`, or
+- [Self-sign](./authentication.mdx#self-signed-tokens) a token with your private key (`strategy: app-iss-app-token`).
+
+The calling app must be attached to the business in the path, otherwise the request is rejected with `403 PERMISSION_DENIED`. A user session token is not accepted on these endpoints and is rejected with `401`.
+:::
+
+:::note What this API does not do yet
+Only **create** and **get one** are available — anything else returns `405`, see
+[Unsupported operations](#unsupported-operations). Until editing ships, corrections are made in
+Refrens.
+:::
+
+### Quick start
+
+1. Create a client:
+
+   ```
+   POST /api/v1/businesses/:urlKey/clients
+   { "clientId": "acme-042", "name": "Acme Traders Pvt Ltd" }
+   ```
+
+2. Get it back:
+
+   ```
+   GET /api/v1/businesses/:urlKey/clients/acme-042
+   ```
+
+`clientId` and `name` are the only required fields. Both requests need
+`Authorization: Bearer <jwt>`, and the create also needs `Content-Type: application/json`.
+
+### Create New Client
+
+<HttpMethod type='post' /> `/api/v1/businesses/:urlKey/clients`
+
+Creates a client in the given business with full billing identity, address, tax ids, shipping
+addresses, bank accounts and custom fields in one call. `clientId` is your own reference for the
+customer and makes the call [safe to retry](#idempotency).
+
+When omitted, the API derives `panNumber` and `gstState` from `gstin`, and fills `taxPayerType`,
+`clientType` and `locale`. A value you send is always kept — deriving never overwrites it.
+
+<Tabs>
+  <TabItem value="request" label="Request">
+    **Path Params**
+
+    | Name      | Description                              |
+    | --------- | ---------------------------------------- |
+    | `urlKey`  | The business urlKey provided by Refrens. |
+
+    **Headers**
+
+    | Name             | Type   | `Value` Description |
+    | ---------------- | ------ | ------------------- |
+    | Content-Type \*  | string | `application/json`  |
+    | Authorization \* | string | `Bearer <jwt>`      |
+
+    **Body — identity and contact**
+
+    | Name                | Type    | `Value` Description                                                                                                                                                     |
+    | ------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+    | clientId \*         | string  | Your customer reference. Unique within the business, maximum 128 characters, trimmed before storing. See [Idempotency](#idempotency) for retry behaviour. |
+    | name \*             | string  | Client name. At least 1 character after trimming, maximum 500.                                                                                                          |
+    | alias               | string  | Short name / alias. Maximum 500 characters.                                                                                                                             |
+    | clientType          | string  | `INDIVIDUAL` or `COMPANY`. Derived from the client's tax ids when omitted.                                                                                              |
+    | isClient            | boolean | Whether this party is a customer. Defaults to `true`.                                                                                                                   |
+    | isVendor            | boolean | Also marks the party a vendor. Defaults to `false`. `isClient` and `isVendor` cannot both be `false`.                                                                   |
+    | email               | string  | Validated as an email address.                                                                                                                                          |
+    | phone               | string  | Normalised to `+` followed by digits — brackets, spaces and hyphens are stripped and a leading `+` added if absent, so `(91) 12345-67890` is stored as `+911234567890`. Maximum 30 characters. |
+    | phoneShowInInvoice  | boolean | Show the phone number on invoices. Defaults to `false`.                                                                                                                 |
+    | emailShowInInvoice  | boolean | Show the email address on invoices. Defaults to `false`.                                                                                                                |
+    | dueInDays           | number  | Default payment terms for this client, in days.                                                                                                                         |
+    | locale              | string  | Locale for the client's documents, e.g. `en-IN`. Derived from the client's country — or the business's country when the client has none — when omitted.                 |
+
+    **Body — address**
+
+    | Name      | Type   | `Value` Description                                                                                       |
+    | --------- | ------ | --------------------------------------------------------------------------------------------------------- |
+    | street    | string | Maximum 2,500 characters.                                                                                 |
+    | building  | string | Maximum 500 characters.                                                                                   |
+    | city      | string | Maximum 500 characters.                                                                                   |
+    | district  | string | Maximum 500 characters.                                                                                   |
+    | state     | string | Maximum 500 characters. Requires `country` in the same request.                                            |
+    | pincode   | string | Maximum 20 characters.                                                                                    |
+    | country   | string | [`ISO 3166-1 alpha-2`](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2) country code. Defaults to the business's own country when omitted. |
+
+    **Body — tax identifiers**
+
+    | Name          | Type   | `Value` Description                                                                                                                                     |
+    | ------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+    | gstin         | string | 15-character Indian GSTIN, including the UIN, TDS/TCS and OIDAR forms. Fills `panNumber` and `gstState` when those are omitted.                          |
+    | gstState      | string | Indian GST state code, e.g. `29`. Derived from `gstin` when omitted.                                                                                     |
+    | panNumber     | string | 10 alphanumeric characters. Derived from `gstin` when omitted — a GSTIN that carries no PAN simply leaves it empty, which is not an error.                |
+    | trnNumber     | string | UAE TRN — 15 digits beginning with `1`.                                                                                                                  |
+    | tinNumber     | string | Malaysia TIN — 10 to 15 uppercase letters or digits.                                                                                                     |
+    | sstNumber     | string | Malaysia SST — `AAA-9999-99999999` or `A99-9999-99999999`.                                                                                               |
+    | taxPayerType  | string | From the vocabulary for the **business's** country (see below). The API rejects this field for businesses outside India and the UAE. Derived when omitted. |
+    | vatNumber     | string | Stored as given; not format-validated. Maximum 500 characters.                                                                                            |
+    | vatLabel      | string | Label shown against the VAT number. Defaults to `VAT Number`.                                                                                            |
+
+    `taxPayerType` accepted values, by the business's country:
+
+    | Business country | Accepted values                                              |
+    | ---------------- | ------------------------------------------------------------ |
+    | India (`IN`)     | `B2C` `REG` `UNREG` `EXP` `SEZ` `TDS` `DEX` `COM`             |
+    | UAE (`AE`)       | `VATR` `VATNR` `GCCVATR` `GCCVATNR` `NGCC` `VATRDZ` `VATRNDZ` |
+
+    **Body — lists**
+
+    | Name              | Type            | `Value` Description                                                                                          |
+    | ----------------- | --------------- | ------------------------------------------------------------------------------------------------------------ |
+    | additionalIds     | array\[object\] | Country-specific identifiers. Entry shape and vocabulary under [Additional ids](#additional-ids).             |
+    | shippingDetails   | array\[object\] | Shipping addresses. Entry shape under [Shipping addresses](#shipping-addresses).                              |
+    | bankAccounts      | array\[object\] | The client's bank accounts. Entry shape under [Bank accounts](#bank-accounts).                                |
+    | customFields      | object          | Custom field values keyed by the field's display name, e.g. `{ "Industry": "SaaS" }`. Rules and errors under [Custom fields](#custom-fields). |
+
+    Any field not in the tables above is rejected with `400 INVALID_FIELD`, naming the key.
+
+    **Full sample body**
+
+    ```json
+    {
+      "clientId": "acme-042",
+      "name": "Acme Traders Pvt Ltd",
+      "alias": "Acme",
+      "email": "billing@acme.example",
+      "phone": "(91) 12345-67890",
+      "street": "1 MG Road",
+      "building": "Tower A",
+      "city": "Bengaluru",
+      "district": "Bengaluru Urban",
+      "state": "Karnataka",
+      "pincode": "560001",
+      "country": "IN",
+      "gstin": "29AAPFU0939F1ZV",
+      "dueInDays": 15,
+      "additionalIds": [
+        {
+          "label": "UDY",
+          "value": "UDYAM-KA-03-1234567",
+          "showInInvoice": true
+        }
+      ],
+      "shippingDetails": [
+        {
+          "name": "Warehouse",
+          "street": "Dock Road",
+          "city": "Bengaluru",
+          "country": "IN",
+          "gstin": "29AAPFU0939F1ZV",
+          "customHeaders": [{ "label": "PO", "value": "PO-1" }]
+        }
+      ],
+      "bankAccounts": [
+        {
+          "bankAccountName": "Acme Current",
+          "bankAccountNumber": "000111222",
+          "ifscCode": "HDFC0000001",
+          "bankAccountType": "CURRENT",
+          "bankCountry": "IN",
+          "bankCurrency": "INR",
+          "isPrimary": true
+        }
+      ],
+      "customFields": {
+        "Industry": "Manufacturing"
+      }
+    }
+    ```
+
+  </TabItem>
+
+  <TabItem value="response" label="Response">
+    :::success `201: Created`
+    Client created successfully. On an idempotent retry (same `clientId`, same details) the same
+    client is returned with an additional `"idempotent": true` flag.
+
+    `panNumber`, `gstState`, `taxPayerType`, `clientType` and `locale` below were derived — the
+    request did not send them.
+
+    ```json #
+    {
+      "success": true,
+      "data": {
+        "clientId": "acme-042",
+        "name": "Acme Traders Pvt Ltd",
+        "alias": "Acme",
+        "email": "billing@acme.example",
+        "phone": "+911234567890",
+        "phoneShowInInvoice": false,
+        "emailShowInInvoice": false,
+        "clientType": "COMPANY",
+        "isClient": true,
+        "isVendor": false,
+        "street": "1 MG Road",
+        "city": "Bengaluru",
+        "district": "Bengaluru Urban",
+        "building": "Tower A",
+        "pincode": "560001",
+        "state": "Karnataka",
+        "country": "IN",
+        "gstin": "29AAPFU0939F1ZV",
+        "gstState": "29",
+        "panNumber": "AAPFU0939F",
+        "trnNumber": null,
+        "tinNumber": null,
+        "sstNumber": null,
+        "taxPayerType": "REG",
+        "vatNumber": null,
+        "vatLabel": "VAT Number",
+        "dueInDays": 15,
+        "locale": "en-IN",
+        "shippingDetails": [
+          {
+            "name": "Warehouse",
+            "street": "Dock Road",
+            "city": "Bengaluru",
+            "district": null,
+            "building": null,
+            "pincode": null,
+            "state": null,
+            "country": "IN",
+            "gstin": "29AAPFU0939F1ZV",
+            "gstState": null,
+            "sstNumber": null,
+            "tinNumber": null,
+            "taxId": null,
+            "taxPayerType": null,
+            "additionalIds": [],
+            "customHeaders": [{ "label": "PO", "value": "PO-1" }]
+          }
+        ],
+        "bankAccounts": [
+          {
+            "bankAccountName": "Acme Current",
+            "bankAccountHolderName": null,
+            "bankAccountNumber": "000111222",
+            "ifscCode": "HDFC0000001",
+            "iban": null,
+            "sortCode": null,
+            "swift": null,
+            "bankAccountType": "CURRENT",
+            "bankCountry": "IN",
+            "bankCurrency": "INR",
+            "isPrimary": true
+          }
+        ],
+        "additionalIds": [
+          {
+            "label": "UDY",
+            "value": "UDYAM-KA-03-1234567",
+            "showInInvoice": true,
+            "useForEInvoice": false
+          }
+        ],
+        "customFields": {
+          "Industry": "Manufacturing"
+        },
+        "source": "API",
+        "createdAt": "2026-08-13T09:14:22.481Z",
+        "updatedAt": "2026-08-13T09:14:22.481Z",
+        "balance": {
+          "invoice": 0,
+          "proforma": 0,
+          "creditNote": 0,
+          "paymentReceipt": 0,
+          "debitNote": 0,
+          "salesOrder": 0,
+          "invoicePayment": 0,
+          "proformaPayment": 0,
+          "expenditure": 0,
+          "expenditurePayment": 0,
+          "creditConsumed": 0,
+          "currency": "INR"
+        }
+      }
+    }
+    ```
+
+    :::
+    :::danger `400: Bad Request`
+    Validation failed and nothing was stored. `data.error.code` identifies the reason (see
+    [Error codes](#error-codes)). When several fields fail, `data.error.errors` lists every one of
+    them while `data.error.message` and `data.error.code` carry the first.
+
+    ```json #
+    {
+      "name": "BadRequest",
+      "message": "gstin must be a valid 15-character GSTIN (including UIN / TDS-TCS / OIDAR forms)",
+      "code": 400,
+      "className": "bad-request",
+      "data": {
+        "success": false,
+        "error": {
+          "message": "gstin must be a valid 15-character GSTIN (including UIN / TDS-TCS / OIDAR forms)",
+          "code": "INVALID_FIELD_VALUE",
+          "status": 400,
+          "errors": [
+            {
+              "field": "gstin",
+              "message": "gstin must be a valid 15-character GSTIN (including UIN / TDS-TCS / OIDAR forms)",
+              "code": "INVALID_FIELD_VALUE"
+            },
+            {
+              "field": "country",
+              "message": "country is required when state is provided",
+              "code": "INVALID_FIELD_VALUE"
+            }
+          ]
+        }
+      },
+      "errors": {}
+    }
+    ```
+
+    :::
+    :::danger `409: Conflict`
+    A client already uses this `clientId` and the details you sent are different from what is
+    stored — see [Idempotency](#idempotency). Create is never an edit: correct the client in
+    Refrens, or use a different `clientId` for a different customer.
+
+    ```json #
+    {
+      "name": "BadRequest",
+      "message": "A client with this clientId already exists with different details",
+      "code": 409,
+      "className": "bad-request",
+      "data": {
+        "success": false,
+        "error": {
+          "message": "A client with this clientId already exists with different details",
+          "code": "IDEMPOTENCY_CONFLICT",
+          "status": 409
+        }
+      },
+      "errors": {}
+    }
+    ```
+
+    :::
+    :::danger `401: Unauthorized`
+    Missing, malformed, or invalid app token — including a valid user session token, which these
+    endpoints do not accept.
+
+    ```json #
+    {
+      "name": "NotAuthenticated",
+      "message": "Invalid login",
+      "code": 401,
+      "className": "not-authenticated",
+      "data": {
+        "message": "Invalid login"
+      },
+      "errors": {}
+    }
+    ```
+
+    :::
+
+  </TabItem>
+</Tabs>
+
+#### Idempotency
+
+`clientId` makes the create safe to retry — if the connection drops, send the identical request
+again:
+
+| Case                                                  | Response                                                    |
+| ----------------------------------------------------- | ----------------------------------------------------------- |
+| New `clientId`                                        | `201` + the full client.                                    |
+| Same `clientId`, same details                         | `201` + the full client with `"idempotent": true`.          |
+| Same `clientId`, different details                    | `409 IDEMPOTENCY_CONFLICT`. Nothing is changed.             |
+| Same `clientId`, but the body fails validation        | `400`, never `409` — whether or not the reference is taken. |
+| Same `clientId`, held by a client archived in Refrens | `409 IDEMPOTENCY_CONFLICT`. The reference stays taken.      |
+
+**What counts as different details.** Refrens compares the client your request _would_ store — after
+normalisation and after filling in derived values — against the client already stored. Details are
+different when they would store a different value. So these are all identical retries, not conflicts:
+
+- Omitting a field the API filled in for you. Send a `gstin` and no `panNumber` twice: the same PAN
+  is derived both times.
+- Restating a derived value unchanged, or omitting a field whose stored value is its default.
+- A differently formatted but equivalent value — `Billing@Acme.example` and `billing@acme.example`,
+  or `(91) 12345-67890` and `+911234567890`.
+- Reordering entries in `additionalIds`, `shippingDetails`, or `bankAccounts`.
+
+`balance`, `source`, `createdAt` and `updatedAt` are never part of the comparison.
+
+Dropping a value is a change, so a retry that omits a plain optional field the first call stored —
+`alias`, say — conflicts. Send the same body you sent the first time.
+
+**No silent merging.** A matching email, phone or tax id never merges two clients — identity is
+`clientId` alone. A client created through this API and one created as a side effect of an invoice
+for the same customer stay two separate records.
+
+#### Additional ids
+
+Each entry is `{ label, value, showInInvoice, useForEInvoice }`, where `label` is the **ID code**
+below, not its display name. `value` is required. One entry per code — the same code twice is
+rejected.
+
+Available codes depend on the **client's** `country` and role: `client` codes need `isClient`, `seller`
+codes need `isVendor`, and `both` suits either.
+
+| Country             | Code       | Identifier                          | Scope  | Format                                                               |
+| ------------------- | ---------- | ----------------------------------- | ------ | -------------------------------------------------------------------- |
+| India (`IN`)        | `UDY`      | Udyam Registration Number           | both   | `UDYAM-XX-00-0000000`                                                |
+|                     | `IEC`      | Importer Exporter Code              | seller | 10 uppercase letters or digits                                       |
+|                     | `LUT`      | Letter of Undertaking               | seller | 15 characters — two letters, twelve digits, then one letter or digit |
+| Saudi Arabia (`SA`) | `NAT`      | National ID                         | client | any non-empty value                                                  |
+|                     | `TIN`      | Tax Identification Number           | client | any non-empty value                                                  |
+|                     | `IQA`      | Iqama Number                        | client | any non-empty value                                                  |
+|                     | `PAS`      | Passport ID                         | client | any non-empty value                                                  |
+|                     | `GCC`      | GCC ID                              | client | any non-empty value                                                  |
+|                     | `CRN`      | Commercial Registration Number      | both   | any non-empty value                                                  |
+|                     | `MOM`      | Momra License                       | both   | any non-empty value                                                  |
+|                     | `MLS`      | MLSD License                        | both   | any non-empty value                                                  |
+|                     | `SAG`      | Sagia License                       | both   | any non-empty value                                                  |
+|                     | `OTH`      | Other ID                            | both   | any non-empty value                                                  |
+|                     | `HQ`       | Group VAT Number                    | seller | any non-empty value                                                  |
+| Malaysia (`MY`)     | `BRN`      | Business Registration Number        | both   | any non-empty value                                                  |
+|                     | `NRIC`     | National Registration Identity Card | both   | any non-empty value                                                  |
+|                     | `PASSPORT` | Passport Number                     | both   | any non-empty value                                                  |
+
+A code outside the list for the client's country — or any code at all when the client has no country
+set — is rejected with `400 INVALID_FIELD_VALUE`.
+
+`useForEInvoice` selects the identifier e-invoicing reads in Saudi Arabia and Malaysia. At most one
+entry per client can carry it: setting it on several is not refused, but only the first entry in the
+array keeps the flag. India's e-invoicing never reads it — sending it on an Indian client is accepted
+and has no effect.
+
+#### Shipping addresses
+
+Each `shippingDetails[]` entry accepts `name`, `street`, `building`, `city`, `district`, `state`,
+`pincode`, `country`, `gstin`, `gstState`, `sstNumber`, `tinNumber`, `taxId`, `taxPayerType`,
+`additionalIds[]` and `customHeaders[]` of `{ label, value }`.
+
+| Fields                                                   | Rule                                                           |
+| -------------------------------------------------------- | -------------------------------------------------------------- |
+| `name`, `building`, `city`, `district`, `state`          | Maximum 500 characters.                                        |
+| `street`                                                 | Maximum 2,500 characters.                                      |
+| `pincode`                                                | Maximum 20 characters.                                         |
+| `country`, `gstin`, `gstState`, `sstNumber`, `tinNumber` | Validated exactly as the client's own fields of the same name. |
+| `taxId`, `taxPayerType`                                  | Free text, maximum 500 characters. No vocabulary check.        |
+| `additionalIds[]`                                        | Same codes and formats as the client's own `additionalIds`.    |
+| `customHeaders[]`                                        | `label` maximum 500 characters, `value` maximum 2,500.         |
+
+An address's `additionalIds` are validated against the **client's** own country and party type, not
+the address's. Nothing is derived inside a shipping address — a shipping `gstin` does not fill that
+address's `gstState` or `panNumber`.
+
+#### Bank accounts
+
+Each `bankAccounts[]` entry accepts:
+
+| Name                  | Type    | `Value` Description                                                    |
+| --------------------- | ------- | ---------------------------------------------------------------------- |
+| bankAccountName       | string  | Maximum 500 characters.                                                |
+| bankAccountHolderName | string  | Maximum 500 characters.                                                |
+| bankAccountNumber     | string  | Maximum 2,500 characters.                                              |
+| ifscCode              | string  | Maximum 500 characters.                                                |
+| iban                  | string  | Maximum 500 characters.                                                |
+| sortCode              | string  | `NN-NN-NN` or `NNNNNN`. Only valid when `bankCountry` is `GB` or `IE`. |
+| swift                 | string  | Maximum 500 characters.                                                |
+| bankAccountType       | string  | `SAVINGS` or `CURRENT`.                                                |
+| bankCountry           | string  | ISO 3166-1 alpha-2 country code.                                       |
+| bankCurrency          | string  | [`ISO 4217`](https://en.wikipedia.org/wiki/ISO_4217) currency code.    |
+| isPrimary             | boolean | Marks the client's primary account. Defaults to `false`.               |
+
+No operation in this API removes a bank account — that is done in Refrens.
+
+#### Custom fields
+
+`customFields` is an object keyed by the **display name** the business sees in Refrens, e.g.
+`{ "Industry": "SaaS" }`. Internal field keys never appear in either direction.
+
+- Custom fields must be enabled for the business, otherwise `400 CUSTOM_FIELDS_NOT_ENABLED`.
+- Every name must match a live, non-archived Clients custom field. Unknown names are reported
+  together in one `400 INVALID_CUSTOM_FIELD`.
+- A name that resolves but carries a value the field does not accept is `400 INVALID_CUSTOM_FIELD_VALUE`.
+- The API never creates a custom field or an option value.
+
+---
+
+### Get a Client
+
+<HttpMethod type='get' /> `/api/v1/businesses/:urlKey/clients/:clientId`
+
+Returns the client stored under `clientId`. Use this endpoint after creating a client to confirm what
+the API stored. See [Response shape](#response-shape) for the returned fields.
+
+<Tabs>
+  <TabItem value="request" label="Request">
+    **Path Params**
+
+    | Name       | Description                                                            |
+    | ---------- | ---------------------------------------------------------------------- |
+    | `urlKey`   | The business urlKey provided by Refrens.                               |
+    | `clientId` | The reference you sent as `clientId` when the client was created.       |
+
+    **Headers**
+
+    | Name             | Type   | `Value` Description |
+    | ---------------- | ------ | ------------------- |
+    | Authorization \* | string | `Bearer <jwt>`      |
+
+    No request body and **no query parameters** — any query parameter is rejected with
+    `400 INVALID_QUERY_FIELD`.
+
+  </TabItem>
+
+  <TabItem value="response" label="Response">
+    :::success `200: OK`
+    `200` returns the current client in the shared [response shape](#response-shape). It does not
+    include the create-only `idempotent` flag.
+
+    ```json #
+    {
+      "success": true,
+      "data": {
+        "clientId": "acme-042",
+        "name": "Acme Traders Pvt Ltd",
+        "clientType": "COMPANY",
+        "isClient": true,
+        "isVendor": false,
+        "country": "IN",
+        "gstin": "29AAPFU0939F1ZV",
+        "gstState": "29",
+        "panNumber": "AAPFU0939F",
+        "taxPayerType": "REG",
+        "locale": "en-IN",
+        "shippingDetails": [],
+        "bankAccounts": [],
+        "additionalIds": [],
+        "customFields": {},
+        "source": "API",
+        "createdAt": "2026-08-13T09:14:22.481Z",
+        "updatedAt": "2026-08-13T09:31:07.220Z",
+        "balance": {
+          "invoice": 25000,
+          "proforma": 0,
+          "creditNote": 0,
+          "paymentReceipt": 10000,
+          "debitNote": 0,
+          "salesOrder": 0,
+          "invoicePayment": 10000,
+          "proformaPayment": 0,
+          "expenditure": 0,
+          "expenditurePayment": 0,
+          "creditConsumed": 0,
+          "currency": "INR"
+        }
+      }
+    }
+    ```
+
+    :::
+    :::danger `404: Not Found`
+    No reachable client under this reference. A client that never existed, one archived or deleted
+    in Refrens, and one belonging to another business all return this same response — see
+    [Visibility](#visibility).
+
+    ```json #
+    {
+      "name": "NotFound",
+      "message": "Client not found",
+      "code": 404,
+      "className": "not-found",
+      "data": {
+        "success": false,
+        "error": {
+          "message": "Client not found",
+          "code": "CLIENT_NOT_FOUND",
+          "status": 404
+        }
+      },
+      "errors": {}
+    }
+    ```
+
+    :::
+    :::danger `400: Bad Request`
+    A query parameter was sent. Fetch takes none.
+
+    ```json #
+    {
+      "name": "BadRequest",
+      "message": "Unknown query field: includeArchived",
+      "code": 400,
+      "className": "bad-request",
+      "data": {
+        "success": false,
+        "error": {
+          "message": "Unknown query field: includeArchived",
+          "code": "INVALID_QUERY_FIELD",
+          "status": 400
+        }
+      },
+      "errors": {}
+    }
+    ```
+
+    :::
+
+  </TabItem>
+</Tabs>
+
+#### Visibility
+
+GET returns a client only when it exists in the business your app is attached to and has not been
+archived or deleted in Refrens. Everything else returns one indistinguishable
+`404 CLIENT_NOT_FOUND`.
+
+This endpoint addresses clients by `clientId`, so it reaches only clients created through this API.
+Clients created elsewhere in Refrens carry no `clientId` and cannot be fetched here. Until search
+ships, create the clients you need to read.
+
+Vendors created through this API are readable here too.
+
+---
+
+### Response shape
+
+Both operations return the client in the same shape:
+
+- Your own reference as `clientId`.
+- Every stored field from the create tables above, including the three lists.
+- `customFields`, keyed by display name.
+- `source` — `API` for a client created through this API. Clients created elsewhere in Refrens carry
+  their own origin, such as `INVOICE`, `CLIENT_DASHBOARD`, `CLIENT_UPLOAD`, `DASHBOARD`,
+  `INVOICE_BULK_UPLOAD`, `LEADFORM`, `PORTFOLIO`, `ZOHO`, `MARIKA` or `LEADAPI`.
+- `createdAt` and `updatedAt`.
+- `balance` — a read-only summary derived from the client's documents and payments, with
+  `invoice`, `proforma`, `creditNote`, `paymentReceipt`, `debitNote`, `salesOrder`, `invoicePayment`,
+  `proformaPayment`, `expenditure`, `expenditurePayment`, `creditConsumed` and `currency`. It changes
+  as the client transacts, without this API being called.
+
+Create adds `"idempotent": true` on a retry that matched. No Refrens-internal identifier appears in
+any response, at any depth, and no error message names an internal field.
+
+### Error codes
+
+| `error.code`                 | Status | When                                                                                                                           |
+| ---------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| `INVALID_FIELD`              | 400    | A body key outside the accepted set, a server-owned field, a wrongly typed value, or a body that is not a JSON object.         |
+| `INVALID_FIELD_VALUE`        | 400    | An accepted field carrying a malformed or unsupported value, or a missing `clientId` / `name`. Names the field as you sent it. |
+| `INVALID_QUERY_FIELD`        | 400    | Any query parameter on fetch, which takes none.                                                                                |
+| `CUSTOM_FIELDS_NOT_ENABLED`  | 400    | `customFields` sent to a business without custom fields enabled.                                                               |
+| `INVALID_CUSTOM_FIELD`       | 400    | A custom field name the business has not defined, or has archived.                                                             |
+| `INVALID_CUSTOM_FIELD_VALUE` | 400    | A defined custom field carrying a value it does not accept.                                                                    |
+| `PERMISSION_DENIED`          | 403    | The calling app is not attached to this business.                                                                              |
+| `CLIENT_NOT_FOUND`           | 404    | Unknown, archived, deleted, or another business's client.                                                                      |
+| `IDEMPOTENCY_CONFLICT`       | 409    | Same `clientId` with different details, or a reference held by an archived client.                                             |
+| `SERVICE_ERROR`              | 500    | Unexpected server error. The response carries a generic message.                                                               |
+
+`401` responses carry no `error.code` — they come from authentication before this API's own error
+envelope applies.
+
+**Name errors versus value errors:**
+
+| Surface         | Bad name               | Bad value                     |
+| --------------- | ---------------------- | ----------------------------- |
+| Body field      | `INVALID_FIELD`        | `INVALID_FIELD_VALUE`         |
+| Query parameter | `INVALID_QUERY_FIELD`  | — (fetch takes no parameters) |
+| Custom field    | `INVALID_CUSTOM_FIELD` | `INVALID_CUSTOM_FIELD_VALUE`  |
+
+### Unsupported operations
+
+Listing, searching, editing and deleting clients are not available yet. `GET` on the collection, and
+`PATCH`, `PUT` or `DELETE` on a client, all return `405` — the status alone, with no `error.code` —
+so you can tell an operation that is not built apart from a client that is not there.
