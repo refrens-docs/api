@@ -506,18 +506,24 @@ updated lead; it does not add an `idempotent` flag.
 
 ---
 
-### List &amp; Search Leads
+### List and Search Leads
 
 <HttpMethod type='get' /> `/api/v1/businesses/:urlKey/leads`
 
-Returns a paginated page of the business's leads. Every lead in the page uses the same external
-shape as Create Lead and Edit Lead, so a list result and a single-lead read are interchangeable.
+Returns a paginated page of the business's leads. The leads are at `data[0].items`, and each one
+uses the same shape as Create Lead and Edit Lead — optional fields such as `subject`, `details` and
+`budget` are omitted when the lead has no value for them.
 
-Filters fall into three groups: **structured filters** resolved by name against the business's CRM
-configuration (`pipeline`, `stage`, `tags`, `leadSource`, `assignedTo`, `status`), **exact-match
-lookups** (`contactName`, `contactEmail`, `contactPhone`, `externalId`, `clientId`, `contactId`), and
-**free-text search** (`q`, `subject`, `details`). Scoping to your business is applied by the server;
-sending `business` or `isRemoved` yourself is rejected.
+Filters fall into four groups:
+
+- **Structured filters** matched by name: `pipeline`, `stage`, `tags`, `leadSource`, `assignedTo`
+  and `status`.
+- **Exact-match lookups**: `contactName`, `contactEmail`, `contactPhone`, `externalId`, `clientId`,
+  `contactId`.
+- **Ranges** over `createdAt`, `followUpDate` and `budget`.
+- **Free-text search**: `q`, `subject`, `details`.
+
+The server scopes every result to your business.
 
 <Tabs>
   <TabItem value="request" label="Request">
@@ -544,9 +550,12 @@ sending `business` or `isRemoved` yourself is rejected.
     **Structured filters**
 
     Each of these accepts multiple values, either comma-separated (`?status=OPEN,CLOSED`) or with the
-    `$in` operator (`?status[$in][]=OPEN&status[$in][]=NEW`). Values within one filter are OR-ed;
-    separate filters are AND-ed. Every value is resolved against your CRM configuration, so an
-    unknown or archived name is an error rather than an empty page.
+    `$in` operator (`?status[$in][]=OPEN&status[$in][]=NEW`). A lead matches if it matches **any**
+    value within one filter, and it must satisfy **every** filter you send.
+
+    `pipeline`, `stage`, `tags`, `leadSource` and `assignedTo` are resolved against your business's
+    own CRM configuration, so an unknown or archived name is an error rather than an empty page.
+    `status` is different: it is a fixed set defined by Refrens, not something you configure.
 
     | Name       | Type          | `Value` Description                                                                                                                        |
     | ---------- | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -554,7 +563,7 @@ sending `business` or `isRemoved` yourself is rejected.
     | stage      | string        | Stage name. **Requires `pipeline` in the same request**, otherwise `INVALID_STAGE`. Pass `UNSTAGED` to match leads with no stage set.       |
     | tags       | array[string] | Tag names. Unknown or archived tags return `INVALID_TAG`.                                                                                  |
     | leadSource | string        | Lead-source key or exact label. Unknown or archived sources return `INVALID_LEAD_SOURCE`.                                                  |
-    | assignedTo | string        | Business user's email. Pass `UNASSIGNED` to match unassigned leads, and combine it with emails to match either. Unknown emails return `INVALID_ASSIGNEE`. |
+    | assignedTo | string        | Business user's email. Unknown emails return `INVALID_ASSIGNEE`. Pass the literal `UNASSIGNED` to match leads with no assignee. `?assignedTo=sam@acme.com,UNASSIGNED` matches leads assigned to Sam **and** leads assigned to nobody. |
     | status     | string        | Lead status. Unknown values return `INVALID_QUERY_VALUE`, which names the offending value.                                                 |
 
     **Exact-match lookups**
@@ -588,9 +597,10 @@ sending `business` or `isRemoved` yourself is rejected.
 
     **Free-text search**
 
-    Free-text search is powered by Elasticsearch. When any of these is present, results are ordered
-    by relevance and the default `createdAt` sort is not applied — an explicit `$sort` still rides
-    along as a tiebreaker. Supplying more than one narrows the result, since they are AND-ed.
+    Free-text search runs on Elasticsearch. Adding any of these parameters orders results by
+    relevance instead of the default `createdAt` sort. An explicit `$sort` still applies, breaking
+    ties between equally relevant leads. Using two or more of these parameters together narrows the
+    result, because a lead must match all of them.
 
     | Name    | Type   | `Value` Description                                                                                          |
     | ------- | ------ | -------------------------------------------------------------------------------------------------------------- |
@@ -598,9 +608,9 @@ sending `business` or `isRemoved` yourself is rejected.
     | subject | string | Searches the lead subject only.                                                                              |
     | details | string | Searches the lead details only.                                                                              |
 
-    Free-text search needs Elasticsearch to be enabled for the environment. Where it is not, these
-    parameters return `400 SEARCH_UNAVAILABLE` rather than falling back to a weaker search — use the
-    structured filters instead.
+    Free-text search is available on the production API. Where Elasticsearch is not enabled — some
+    test and staging environments — these three parameters return `400 SEARCH_UNAVAILABLE` rather
+    than falling back to a weaker search. Use the structured filters there instead.
 
     **Examples**
 
@@ -628,9 +638,9 @@ sending `business` or `isRemoved` yourself is rejected.
 
   <TabItem value="response" label="Response">
     :::success `200: OK`
-    A page of leads. Note that `data` is an **array containing a single page object** — read the
-    leads from `data[0].items`. `total` is the number of leads matching the filters, not the number
-    returned in this page.
+    A page of leads. `data` is an **array containing a single page object** — read the leads from
+    `data[0].items`. `total` counts every lead matching the filters, not the number returned in this
+    page.
 
     ```json #
     {
@@ -751,14 +761,15 @@ The two behave differently, and the difference is deliberate:
 | You send                                                              | You get                                                                    |
 | --------------------------------------------------------------------- | -------------------------------------------------------------------------- |
 | A name that is not in your CRM config (`pipeline`, `stage`, `tags`, `leadSource`, `assignedTo`, `status`) | `400` with the offending value named. A typo is reported, not silently ignored. |
-| A valid name that simply has no leads                                 | `200` with an empty `items` array and `total: 0`.                          |
+| A valid name that has no leads                                        | `200` with an empty `items` array and `total: 0`.                          |
 | An id or exact value that does not resolve (`clientId`, `contactId`, `externalId`, `contactName`, `contactEmail`, `contactPhone`) | `200` with an empty `items` array and `total: 0`.                          |
 
 #### Query safety
 
-Only the parameters listed above are accepted; anything else returns `INVALID_QUERY_FIELD`. This
-includes the fields the server sets for you — sending `business` or `isRemoved` is rejected rather
-than honoured, so a caller cannot widen the query beyond its own business or reach removed leads.
+The endpoint accepts only the parameters listed above; anything else returns
+`INVALID_QUERY_FIELD`. That includes the fields the server sets for you: sending `business` or
+`isRemoved` is rejected rather than honoured, so you cannot widen a query beyond your own business
+or reach removed leads.
 
 Operator syntax is limited to `$in` on the structured filters. Any other operator on any parameter —
 for example `?externalId[$regex]=.*` or `?contactEmail[$ne]=x` — returns `INVALID_QUERY_VALUE`.
@@ -768,7 +779,7 @@ for example `?externalId[$regex]=.*` or `?contactEmail[$ne]=x` — returns `INVA
 | `error.code`               | Status | When                                                                                                    |
 | -------------------------- | ------ | --------------------------------------------------------------------------------------------------------- |
 | `INVALID_QUERY_FIELD`      | 400    | Unknown query parameter, a server-applied field such as `business` or `isRemoved`, or a non-sortable `$sort` key. |
-| `INVALID_QUERY_VALUE`      | 400    | Unknown `status`, malformed date or number, inverted range, disallowed operator, or a misused `followUpDate`. |
+| `INVALID_QUERY_VALUE`      | 400    | Unknown `status`, malformed date or number, inverted range, or a disallowed operator. Also returned when `followUpDate` is given any value other than `none`, or is combined with `followUpDateFrom` / `followUpDateTo`. |
 | `INVALID_PAGINATION_LIMIT` | 400    | `$limit` is not a whole number between 1 and 50.                                                        |
 | `INVALID_PAGINATION_SKIP`  | 400    | `$skip` is not a whole number between 0 and 1000.                                                       |
 | `INVALID_PIPELINE`         | 400    | `pipeline` is unknown or archived.                                                                      |
