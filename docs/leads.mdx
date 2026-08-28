@@ -4,9 +4,10 @@ sidebar_position: 8
 
 # Leads
 
-Create and update leads in a Refrens CRM business from an external system. Lead creation is
-**idempotent** on a caller-supplied `externalId`, while lead updates use the `leadId` returned by
-the create response.
+Create, update, list and search leads in a Refrens CRM business from an external system. Lead
+creation is **idempotent** on a caller-supplied `externalId`, while lead updates use the `leadId`
+returned by the create response. Listing returns each lead in that same shape, so you can page
+through a business's leads or search them without a second lookup.
 
 :::info Authentication
 Like every Refrens API endpoint, the Leads API is authorised with an **app token** sent as `Authorization: Bearer <jwt>`. You can obtain the token in either of two ways:
@@ -502,3 +503,279 @@ updated lead; it does not add an `idempotent` flag.
 | `SERVICE_ERROR`                 | 500    | Unexpected server error.                                                                      |
 
 `EXTERNAL_ID_REQUIRED` and `IDEMPOTENCY_CONFLICT` are create-only and are never returned by PATCH.
+
+---
+
+### List &amp; Search Leads
+
+<HttpMethod type='get' /> `/api/v1/businesses/:urlKey/leads`
+
+Returns a paginated page of the business's leads. Every lead in the page uses the same external
+shape as Create Lead and Edit Lead, so a list result and a single-lead read are interchangeable.
+
+Filters fall into three groups: **structured filters** resolved by name against the business's CRM
+configuration (`pipeline`, `stage`, `tags`, `leadSource`, `assignedTo`, `status`), **exact-match
+lookups** (`contactName`, `contactEmail`, `contactPhone`, `externalId`, `clientId`, `contactId`), and
+**free-text search** (`q`, `subject`, `details`). Scoping to your business is applied by the server;
+sending `business` or `isRemoved` yourself is rejected.
+
+<Tabs>
+  <TabItem value="request" label="Request">
+    **Path Params**
+
+    | Name     | Description                            |
+    | -------- | -------------------------------------- |
+    | `urlKey` | The business urlKey provided by Refrens. |
+
+    **Headers**
+
+    | Name             | Type   | `Value` Description |
+    | ---------------- | ------ | ------------------- |
+    | Authorization \* | string | `Bearer <jwt>`      |
+
+    **Pagination and sorting**
+
+    | Name     | Type   | `Value` Description                                                                                                                            |
+    | -------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+    | $limit   | number | Page size. Defaults to `10`, maximum `50`. Must be a whole number; `0`, a negative, or a non-numeric value is rejected.                       |
+    | $skip    | number | Number of leads to skip. Defaults to `0`, maximum `1000`. Same whole-number rule as `$limit`.                                                 |
+    | $sort    | object | Sort direction keyed by field, for example `?$sort[createdAt]=-1`. Only `createdAt`, `updatedAt`, `followUpDate` and `budget.amount` are sortable. Defaults to `createdAt` descending. |
+
+    **Structured filters**
+
+    Each of these accepts multiple values, either comma-separated (`?status=OPEN,CLOSED`) or with the
+    `$in` operator (`?status[$in][]=OPEN&status[$in][]=NEW`). Values within one filter are OR-ed;
+    separate filters are AND-ed. Every value is resolved against your CRM configuration, so an
+    unknown or archived name is an error rather than an empty page.
+
+    | Name       | Type          | `Value` Description                                                                                                                        |
+    | ---------- | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+    | pipeline   | string        | Pipeline name. Unknown or archived pipelines return `INVALID_PIPELINE`.                                                                    |
+    | stage      | string        | Stage name. **Requires `pipeline` in the same request**, otherwise `INVALID_STAGE`. Pass `UNSTAGED` to match leads with no stage set.       |
+    | tags       | array[string] | Tag names. Unknown or archived tags return `INVALID_TAG`.                                                                                  |
+    | leadSource | string        | Lead-source key or exact label. Unknown or archived sources return `INVALID_LEAD_SOURCE`.                                                  |
+    | assignedTo | string        | Business user's email. Pass `UNASSIGNED` to match unassigned leads, and combine it with emails to match either. Unknown emails return `INVALID_ASSIGNEE`. |
+    | status     | string        | Lead status. Unknown values return `INVALID_QUERY_VALUE`, which names the offending value.                                                 |
+
+    **Exact-match lookups**
+
+    These match the stored value exactly — no partial or fuzzy matching. Use free-text search for
+    that. A value that matches nothing returns an empty page, not an error.
+
+    | Name         | Type   | `Value` Description                                                                                                            |
+    | ------------ | ------ | -------------------------------------------------------------------------------------------------------------------------------- |
+    | contactName  | string | Exact contact name.                                                                                                            |
+    | contactEmail | string | Exact contact email.                                                                                                           |
+    | contactPhone | string | Exact contact phone. Spaces, dashes and brackets are stripped before matching, so `+91 99999 88888` and `+919999988888` are equivalent. |
+    | externalId   | string | The `externalId` supplied when the lead was created.                                                                           |
+    | clientId     | string | The `customer.clientId` from a lead response. An id that does not resolve returns an empty page.                              |
+    | contactId    | string | The `contact.contactId` from a lead response. An id that does not resolve returns an empty page.                              |
+
+    **Ranges**
+
+    Either bound of a range may be omitted. A bound that is not a valid date or number, or a range
+    whose lower bound is after its upper bound, returns `INVALID_QUERY_VALUE`.
+
+    | Name              | Type   | `Value` Description                                                                                                        |
+    | ----------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------- |
+    | createdAtFrom     | string | ISO date. Leads created on or after this instant.                                                                          |
+    | createdAtTo       | string | ISO date. Leads created on or before this instant.                                                                         |
+    | followUpDateFrom  | string | ISO date. Leads whose follow-up date is on or after this instant.                                                          |
+    | followUpDateTo    | string | ISO date. Leads whose follow-up date is on or before this instant.                                                        |
+    | followUpDate      | string | Accepts only the literal `none`, matching leads with no follow-up date set. Cannot be combined with the range bounds above. |
+    | budgetMin         | number | Leads whose budget amount is at least this value.                                                                          |
+    | budgetMax         | number | Leads whose budget amount is at most this value.                                                                           |
+
+    **Free-text search**
+
+    Free-text search is powered by Elasticsearch. When any of these is present, results are ordered
+    by relevance and the default `createdAt` sort is not applied — an explicit `$sort` still rides
+    along as a tiebreaker. Supplying more than one narrows the result, since they are AND-ed.
+
+    | Name    | Type   | `Value` Description                                                                                          |
+    | ------- | ------ | -------------------------------------------------------------------------------------------------------------- |
+    | q       | string | Searches across subject, details, customer name, contact name and contact email in one query.                |
+    | subject | string | Searches the lead subject only.                                                                              |
+    | details | string | Searches the lead details only.                                                                              |
+
+    Free-text search needs Elasticsearch to be enabled for the environment. Where it is not, these
+    parameters return `400 SEARCH_UNAVAILABLE` rather than falling back to a weaker search — use the
+    structured filters instead.
+
+    **Examples**
+
+    ```bash #
+    # Second page of ten, newest first
+    GET /api/v1/businesses/acme/leads?$limit=10&$skip=10
+
+    # Open and closed leads in one pipeline stage, by oldest follow-up first
+    GET /api/v1/businesses/acme/leads?status=OPEN,CLOSED&pipeline=Sales%20Pipeline&stage=Contacted&$sort[followUpDate]=1
+
+    # Unassigned leads with no follow-up date set
+    GET /api/v1/businesses/acme/leads?assignedTo=UNASSIGNED&followUpDate=none
+
+    # Reconcile one lead you already know the externalId of
+    GET /api/v1/businesses/acme/leads?externalId=crm-import-8842
+
+    # Every lead for one client, created this year, above a budget floor
+    GET /api/v1/businesses/acme/leads?clientId=1782736514001&createdAtFrom=2026-01-01&budgetMin=10000
+
+    # Free-text across subject, details, customer and contact
+    GET /api/v1/businesses/acme/leads?q=annual%20plan&$limit=20
+    ```
+
+  </TabItem>
+
+  <TabItem value="response" label="Response">
+    :::success `200: OK`
+    A page of leads. Note that `data` is an **array containing a single page object** — read the
+    leads from `data[0].items`. `total` is the number of leads matching the filters, not the number
+    returned in this page.
+
+    ```json #
+    {
+      "success": true,
+      "data": [
+        {
+          "items": [
+            {
+              "leadId": "6a42668216abb5022452276a",
+              "externalId": "crm-import-8842",
+              "customer": {
+                "clientId": "1782736514001",
+                "name": "Acme Corp",
+                "phone": "+91 97394 32668"
+              },
+              "contact": {
+                "contactId": "Jane Doe-1782736514001",
+                "name": "Jane Doe",
+                "phone": ""
+              },
+              "subject": "Website enquiry - annual plan",
+              "status": "OPEN",
+              "leadSource": null,
+              "followUpDate": null,
+              "pipeline": "Sales Pipeline",
+              "stage": "Contacted",
+              "stageReasons": [],
+              "assignedTo": null,
+              "tags": [],
+              "source": "API",
+              "createdAt": "2026-08-23T06:51:19.616Z",
+              "updatedAt": "2026-08-23T06:51:19.616Z"
+            }
+          ],
+          "total": 85,
+          "limit": 10,
+          "skip": 0
+        }
+      ]
+    }
+    ```
+
+    A filter that matches nothing is a successful empty page, never a `404`:
+
+    ```json #
+    {
+      "success": true,
+      "data": [
+        {
+          "items": [],
+          "total": 0,
+          "limit": 10,
+          "skip": 0
+        }
+      ]
+    }
+    ```
+
+    :::
+    :::danger `400: Bad Request`
+    A query parameter was unknown, out of bounds, or could not be resolved. The `error.code`
+    identifies the exact reason (see the table below).
+
+    ```json #
+    {
+      "name": "BadRequest",
+      "message": "Limit must be an integer between 1 and 50, requested 51",
+      "code": 400,
+      "className": "bad-request",
+      "data": {
+        "success": false,
+        "error": {
+          "message": "Limit must be an integer between 1 and 50, requested 51",
+          "code": "INVALID_PAGINATION_LIMIT",
+          "status": 400
+        }
+      },
+      "errors": {}
+    }
+    ```
+
+    :::
+    :::danger `401: Unauthorized`
+    Missing or invalid app token.
+
+    ```json #
+    {
+      "name": "NotAuthenticated",
+      "message": "Invalid login",
+      "code": 401,
+      "className": "not-authenticated",
+      "data": {
+        "message": "Invalid login"
+      },
+      "errors": {}
+    }
+    ```
+
+    :::
+
+  </TabItem>
+</Tabs>
+
+#### Reading a page
+
+`total` counts every lead matching the filters, so paginate by increasing `$skip` until
+`skip + items.length` reaches `total`. With `$limit` capped at 50 and `$skip` capped at 1000, a
+single filter combination can page through at most 1050 leads — narrow the filters (by date range,
+pipeline, or status) to walk a larger book.
+
+Results are sorted newest-first by default. Adding a free-text parameter switches the ordering to
+relevance, so do not rely on date ordering when searching.
+
+#### Unknown values vs no matches
+
+The two behave differently, and the difference is deliberate:
+
+| You send                                                              | You get                                                                    |
+| --------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| A name that is not in your CRM config (`pipeline`, `stage`, `tags`, `leadSource`, `assignedTo`, `status`) | `400` with the offending value named. A typo is reported, not silently ignored. |
+| A valid name that simply has no leads                                 | `200` with an empty `items` array and `total: 0`.                          |
+| An id or exact value that does not resolve (`clientId`, `contactId`, `externalId`, `contactName`, `contactEmail`, `contactPhone`) | `200` with an empty `items` array and `total: 0`.                          |
+
+#### Query safety
+
+Only the parameters listed above are accepted; anything else returns `INVALID_QUERY_FIELD`. This
+includes the fields the server sets for you — sending `business` or `isRemoved` is rejected rather
+than honoured, so a caller cannot widen the query beyond its own business or reach removed leads.
+
+Operator syntax is limited to `$in` on the structured filters. Any other operator on any parameter —
+for example `?externalId[$regex]=.*` or `?contactEmail[$ne]=x` — returns `INVALID_QUERY_VALUE`.
+
+#### FIND error codes
+
+| `error.code`               | Status | When                                                                                                    |
+| -------------------------- | ------ | --------------------------------------------------------------------------------------------------------- |
+| `INVALID_QUERY_FIELD`      | 400    | Unknown query parameter, a server-applied field such as `business` or `isRemoved`, or a non-sortable `$sort` key. |
+| `INVALID_QUERY_VALUE`      | 400    | Unknown `status`, malformed date or number, inverted range, disallowed operator, or a misused `followUpDate`. |
+| `INVALID_PAGINATION_LIMIT` | 400    | `$limit` is not a whole number between 1 and 50.                                                        |
+| `INVALID_PAGINATION_SKIP`  | 400    | `$skip` is not a whole number between 0 and 1000.                                                       |
+| `INVALID_PIPELINE`         | 400    | `pipeline` is unknown or archived.                                                                      |
+| `INVALID_STAGE`            | 400    | `stage` was sent without `pipeline`, or is unknown, archived, or not part of the given pipeline.        |
+| `INVALID_TAG`              | 400    | One or more `tags` are unknown or archived.                                                             |
+| `INVALID_LEAD_SOURCE`      | 400    | `leadSource` is unknown or archived.                                                                    |
+| `INVALID_ASSIGNEE`         | 400    | An `assignedTo` email is not a member of the business.                                                  |
+| `SEARCH_UNAVAILABLE`       | 400    | `q`, `subject` or `details` was used where Elasticsearch is not enabled.                                |
+| `PERMISSION_DENIED`        | 403    | The calling app is not attached to this business.                                                       |
+| `SERVICE_ERROR`            | 500    | Unexpected server error.                                                                                |
