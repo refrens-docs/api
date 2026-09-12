@@ -1,0 +1,247 @@
+---
+sidebar_position: 10
+---
+
+# Sales Pipelines
+
+Fetch the pipeline names, stage names and stage-reason labels that the [Leads API](./leads.mdx)
+accepts. Use this endpoint before creating or updating leads instead of hardcoding CRM configuration.
+
+:::info Authentication
+The Pipelines API is authorised with an **app token** sent as
+`Authorization: Bearer <jwt>`. You can obtain the token in either of two ways:
+
+- Call [Create Token](./authentication.mdx) with `strategy: app-secret`, or
+- [Self-sign](./authentication.mdx#self-signed-tokens) a token with your private key
+  (`strategy: app-iss-app-token`).
+
+The calling app must be attached to the business in the path. Otherwise, the request is rejected
+with `403 PERMISSION_DENIED`. A user session token is not accepted.
+:::
+
+### List Pipelines
+
+<HttpMethod type='get' /> `/api/v1/businesses/:urlKey/pipelines`
+
+Returns all pipelines for the business in one response. Each pipeline contains its stages in their
+configured order. The response also contains the business's stage-reason catalog.
+
+This endpoint is not paginated. It does not support search, filters or sorting.
+
+<Tabs>
+  <TabItem value="request" label="Request">
+    **Path Params**
+
+    | Name     | Description                              |
+    | -------- | ---------------------------------------- |
+    | `urlKey` | The business urlKey provided by Refrens. |
+
+    **Headers**
+
+    | Name             | Type   | Value Description |
+    | ---------------- | ------ | ----------------- |
+    | Authorization \* | string | `Bearer <jwt>`    |
+
+    **Query Params**
+
+    | Name            | Type    | Value Description                                                                                                                |
+    | --------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------- |
+    | includeArchived | boolean | Defaults to `false`. Set to `true` to also return archived pipelines, stages and stage reasons, each marked with `isArchived`. |
+
+    Unknown query parameters, including `$limit`, `$skip` and `$sort`, are rejected.
+
+    **Example**
+
+    ```bash #
+    GET /api/v1/businesses/acme-corp/pipelines
+    ```
+
+    To look up configuration referenced by older leads:
+
+    ```bash #
+    GET /api/v1/businesses/acme-corp/pipelines?includeArchived=true
+    ```
+
+  </TabItem>
+
+  <TabItem value="response" label="Response">
+    :::success `200: OK`
+    The business's pipelines and stage-reason catalog. `data` is an **array containing one
+    configuration object**. Read the values from `data[0].pipelines` and
+    `data[0].stageReasons`.
+
+    ```json #
+    {
+      "success": true,
+      "data": [
+        {
+          "pipelines": [
+            {
+              "id": "63624d091a680bba327b6e19",
+              "name": "Sales Pipeline",
+              "description": "Track potential leads through the sales process.",
+              "isPrimary": true,
+              "isArchived": false,
+              "stages": [
+                {
+                  "id": "vbcyrjok44jpnl557d",
+                  "name": "Contacted",
+                  "state": "OPEN",
+                  "reasons": ["rs-notReachable", "rs-followUpLater"],
+                  "labels": ["Contacted"],
+                  "closure": 10,
+                  "decayThresholdHours": 72,
+                  "isArchived": false
+                },
+                {
+                  "id": "ioila779bhlw684wkj",
+                  "name": "Deal Done",
+                  "state": "CLOSED",
+                  "reasons": ["rs-negotiatedHigher"],
+                  "labels": ["Deal Done"],
+                  "closure": 100,
+                  "isArchived": false
+                }
+              ]
+            }
+          ],
+          "stageReasons": [
+            {
+              "key": "rs-notReachable",
+              "label": "Not reachable",
+              "isArchived": false
+            },
+            {
+              "key": "rs-followUpLater",
+              "label": "Follow up later",
+              "isArchived": false
+            },
+            {
+              "key": "rs-negotiatedHigher",
+              "label": "Negotiated higher",
+              "isArchived": false
+            }
+          ]
+        }
+      ]
+    }
+    ```
+
+    A business with no configured pipelines or reasons returns the same response with empty
+    `pipelines` and `stageReasons` arrays. It does not return `404`.
+
+    :::
+    :::danger `400: Bad Request`
+    A query parameter is unknown or has an invalid value. The stable error code is inside
+    `data.error`.
+
+    ```json #
+    {
+      "name": "BadRequest",
+      "message": "Unsupported query field: '$limit'",
+      "code": 400,
+      "className": "bad-request",
+      "data": {
+        "ignoreErrorLog": true,
+        "success": false,
+        "error": {
+          "message": "Unsupported query field: '$limit'",
+          "code": "INVALID_QUERY_FIELD",
+          "status": 400
+        }
+      },
+      "errors": {}
+    }
+    ```
+
+    :::
+    :::danger `401: Unauthorized`
+    The app token is missing or invalid, or a user session token was supplied instead.
+    :::
+    :::danger `403: Forbidden`
+    The calling app is not attached to the business in the path.
+    :::
+
+  </TabItem>
+</Tabs>
+
+#### Pipeline fields
+
+| Field       | Type          | Description                                                                                                              |
+| ----------- | ------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| id          | string        | Opaque identifier that distinguishes pipelines with the same name. Lead writes still use the pipeline name, not this id. |
+| name        | string        | Pipeline name accepted by lead create and edit while the pipeline is live.                                               |
+| description | string        | Description configured in the dashboard. Omitted when no value is set.                                                   |
+| isPrimary   | boolean       | Whether this is the business's default lead pipeline.                                                                    |
+| isArchived  | boolean       | Whether the pipeline is archived. Archived pipelines are returned only when `includeArchived=true`.                      |
+| stages      | array[object] | Stages in the order configured in the dashboard.                                                                         |
+
+#### Stage fields
+
+| Field               | Type          | Description                                                                                                                                |
+| ------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| id                  | string        | Opaque identifier that distinguishes stages with the same name. Lead writes still use the stage name, not this id.                         |
+| name                | string        | Stage name accepted by lead create and edit while the stage and its pipeline are live.                                                     |
+| state               | string        | Lead status associated with this stage: `NEW`, `OPEN`, `CLOSED`, `DROPPED` or `REJECTED`.                                                  |
+| reasons             | array[string] | Keys from `stageReasons` that this stage accepts. Match each key to its catalog entry, then send that entry's `label` when editing a lead. |
+| labels              | array[string] | Labels configured for the stage, in their configured order.                                                                                |
+| closure             | number        | Sales probability used in reporting. A configured `0` is returned. Omitted when no value is set.                                           |
+| decayThresholdHours | number        | Stage decay threshold in hours. For example, three days is returned as `72`. A configured `0` is returned. Omitted when no value is set.   |
+| isArchived          | boolean       | Whether the stage is archived. Archived stages are returned only when `includeArchived=true` and remain in their configured position.      |
+
+#### Stage-reason fields
+
+| Field      | Type    | Description                                                                                               |
+| ---------- | ------- | --------------------------------------------------------------------------------------------------------- |
+| key        | string  | Stable key referenced by a stage's `reasons` array.                                                       |
+| label      | string  | Value to send in `stageReasons` when editing a lead, provided the target stage lists this reason's `key`. |
+| isArchived | boolean | Whether the reason is archived. Archived reasons are returned only when `includeArchived=true`.           |
+
+#### Use the response with Leads
+
+Lead create and edit resolve pipelines and stages **by name**. They do not accept the `id` values
+returned here.
+
+1. Select a live pipeline and stage from the default response.
+2. Send their `name` values as `pipeline` and `stage` in the lead request.
+3. To add a stage reason, select a catalog entry whose `key` appears in that stage's `reasons`
+   array. Send the catalog entry's `label` in the lead's `stageReasons` array.
+
+```json #
+{
+  "pipeline": "Sales Pipeline",
+  "stage": "Contacted",
+  "stageReasons": ["Not reachable"]
+}
+```
+
+Archived names are returned only to help interpret older leads. Lead create and edit reject an
+archived pipeline, an archived stage, or a stage inside an archived pipeline.
+
+:::warning Duplicate names
+Pipeline and stage names are not guaranteed to be unique. Their `id` values reveal duplicates but
+cannot be used in lead writes. A lead write using a duplicate pipeline name selects the first
+matching pipeline, then looks for the stage only inside that pipeline. Avoid duplicate live names
+when configuring an integration.
+:::
+
+#### Error codes
+
+| `data.error.code`     | Status | When                                                             |
+| --------------------- | ------ | ---------------------------------------------------------------- |
+| `INVALID_QUERY_FIELD` | 400    | Unknown query parameter, including `$limit`, `$skip` or `$sort`. |
+| `INVALID_QUERY_VALUE` | 400    | `includeArchived` has a value other than `true` or `false`.      |
+| `PERMISSION_DENIED`   | 403    | The calling app is not attached to the business in the path.     |
+
+Authentication failures return `401 NotAuthenticated`.
+
+#### Unsupported operations
+
+The Pipelines API is read-only. Creating, editing and archiving pipeline configuration remains in
+the Refrens dashboard. The following operations return `405 Method Not Allowed`:
+
+- `POST /api/v1/businesses/:urlKey/pipelines`
+- `GET /api/v1/businesses/:urlKey/pipelines/:pipelineId`
+- `PATCH /api/v1/businesses/:urlKey/pipelines/:pipelineId`
+- `PUT /api/v1/businesses/:urlKey/pipelines/:pipelineId`
+- `DELETE /api/v1/businesses/:urlKey/pipelines/:pipelineId`
