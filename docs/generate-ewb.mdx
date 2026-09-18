@@ -1,0 +1,217 @@
+---
+sidebar_position: 7
+---
+
+# Generate EWB
+
+### Generation of E-Way Bill (EWB) for Indian Business Invoices
+
+### Overview
+
+An e-Way Bill (EWB) is required for the movement of goods under the GST framework. You can generate an EWB for an invoice with or without an Invoice Reference Number (IRN), and update its vehicle or transporter details when needed.
+
+---
+
+### Generate EWB without IRN
+
+<HttpMethod type='post' /> `/businesses/:urlKey/invoices/:invoice/ewayBill?withoutIrn=true`
+
+This endpoint generates an EWB for an existing invoice without an IRN.
+
+<Tabs>
+  <TabItem value="request" label="Request">
+    **Path Params**
+
+    `urlKey` - The unique identifier of the business. <br />
+    `invoice` - The invoice ID for which the EWB is to be generated.
+
+    **Headers**
+
+    | Name             | Type   | `Value` Description |
+    | ---------------- | ------ | ------------------- |
+    | Content-Type \*  | string | `application/json`  |
+    | Authorization \* | string | `Bearer <jwt>`      |
+
+    This endpoint does not require a request body.
+
+  </TabItem>
+
+  <TabItem value="response" label="Response">
+    :::success `200: OK`
+    The response includes the generated EWB details.
+
+    {/* human-review: drafted response, not captured from a live call */}
+    ```json
+    {
+      "ewbNo": "181012345678",
+      "ewbDt": "15/09/2026 10:30:00",
+      "ewbValidTill": "16/09/2026 23:59:59"
+    }
+    ```
+    :::
+
+    :::danger `401: Unauthorized`
+    Invalid authentication.
+
+    ```json
+    {
+      "name": "NotAuthenticated",
+      "message": "Invalid login",
+      "code": 401,
+      "className": "not-authenticated",
+      "data": {
+        "message": "Invalid login"
+      },
+      "errors": {}
+    }
+    ```
+    :::
+
+  </TabItem>
+</Tabs>
+
+---
+
+### Update Vehicle Details
+
+<HttpMethod type='patch' /> `/businesses/:urlKey/invoices/:invoice/ewaybill/vehicle`
+
+This endpoint updates the vehicle details for an EWB and also regenerates the EWB.
+
+:::info PRE-CONDITIONS
+The EWB on the invoice must exist (`EwbNo` must be present), must not be cancelled, and must not be expired (`EwbValidTill` must be in the future).
+:::
+
+<Tabs>
+  <TabItem value="request" label="Request">
+    **Path Params**
+
+    `urlKey` - The unique identifier of the business. <br />
+    `invoice` - The invoice ID for which the vehicle details are to be updated.
+
+    **Headers**
+
+    | Name             | Type   | `Value` Description |
+    | ---------------- | ------ | ------------------- |
+    | Content-Type \*  | string | `application/json`  |
+    | Authorization \* | string | `Bearer <jwt>`      |
+
+    **Body**
+
+    | Name             | Type          | `Value` Description                                                        |
+    | ---------------- | ------------- | -------------------------------------------------------------------------- |
+    | vehicleNumber \* | string        | Vehicle number                                                             |
+    | vehicleType \*   | string (enum) | `REGULAR`, `OVERDIMENSIONALCARGO`                                         |
+    | transportMode \* | string (enum) | `ROAD`, `RAIL`, `AIR`, `SHIP`                                             |
+    | reasonCode \*    | number        | NIC reason code: `1` Breakdown, `2` Trans-shipment, `3` Others, `4` First Time |
+    | reasonRem \*     | string        | Reason remarks                                                             |
+    | transDocNo       | string        | Optional transport document number                                         |
+    | transDocDate     | string        | Optional transport document date in `dd/MM/yyyy` format                   |
+
+  </TabItem>
+
+  <TabItem value="response" label="Response">
+    :::success `200: OK`
+    The response includes the regenerated EWB's updated vehicle/validity dates.
+
+    ```json
+    {
+      "vehUpdDate": "2026-05-26T13:09:00.000Z",
+      "validUpto": "2026-06-05T23:59:00.000Z",
+      "info": null,
+      "additionalInfo": null,
+      "otherAlert": null
+    }
+    ```
+    :::
+
+    :::danger `401: Unauthorized`
+    Invalid authentication.
+
+    ```json
+    {
+      "name": "NotAuthenticated",
+      "message": "Invalid login",
+      "code": 401,
+      "className": "not-authenticated",
+      "data": {
+        "message": "Invalid login"
+      },
+      "errors": {}
+    }
+    ```
+    :::
+
+  </TabItem>
+</Tabs>
+
+---
+
+### Update Transporter Details
+
+<HttpMethod type='patch' /> `/businesses/:urlKey/invoices/:invoice/ewaybill/transporter`
+
+This endpoint updates the transporter details for an EWB and also regenerates the EWB.
+
+:::info PRE-CONDITIONS
+The EWB on the invoice must exist (`EwbNo` must be present), must not be cancelled, and must not be expired (`EwbValidTill` must be in the future).
+:::
+
+<Tabs>
+  <TabItem value="request" label="Request">
+    **Path Params**
+
+    `urlKey` - The unique identifier of the business. <br />
+    `invoice` - The invoice ID for which the transporter details are to be updated.
+
+    **Headers**
+
+    | Name             | Type   | `Value` Description |
+    | ---------------- | ------ | ------------------- |
+    | Content-Type \*  | string | `application/json`  |
+    | Authorization \* | string | `Bearer <jwt>`      |
+
+    **Body**
+
+    | Name                | Type   | `Value` Description                                      |
+    | ------------------- | ------ | -------------------------------------------------------- |
+    | transporterId \*    | string | The GSTIN of the transporter; must be exactly 15 characters |
+    | transporterName     | string | Optional transporter name                                |
+
+  </TabItem>
+
+  <TabItem value="response" label="Response">
+    :::success `200: OK`
+    The response includes the regenerated EWB's updated transporter details.
+
+    ```json
+    {
+      "ewayBillNo": "861598447600",
+      "transporterId": "19AAAPI3182M007",
+      "transUpdateDate": "2026-05-20T15:45:00.000Z",
+      "info": null,
+      "additionalInfo": null,
+      "otherAlert": null
+    }
+    ```
+    :::
+
+    :::danger `401: Unauthorized`
+    Invalid authentication.
+
+    ```json
+    {
+      "name": "NotAuthenticated",
+      "message": "Invalid login",
+      "code": 401,
+      "className": "not-authenticated",
+      "data": {
+        "message": "Invalid login"
+      },
+      "errors": {}
+    }
+    ```
+    :::
+
+  </TabItem>
+</Tabs>
