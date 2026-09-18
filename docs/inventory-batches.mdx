@@ -1,0 +1,339 @@
+---
+sidebar_position: 13
+---
+
+# Inventory Batches
+
+### Overview
+
+Batches let you track stock by manufacturing date, expiry date, manufacturer, and other batch-level attributes, for inventory items where `trackingMethod` is set to `BATCH`. See the [Inventory](./inventory.mdx) page for managing the items themselves.
+
+---
+
+### List Inventory Batches
+
+<HttpMethod type='get' /> `/api/v1/businesses/:urlKey/inventories/:sku/inventory-batches`
+
+This endpoint allows you to retrieve a paginated list of batches for a batch-tracked inventory item.
+
+<Tabs>
+  <TabItem value="request" label="Request">
+    **Path Params**
+
+    `urlKey` - The unique identifier of the business. <br />
+    `sku` - The SKU of the batch-tracked inventory item.
+
+    **Headers**
+
+    | Name             | Type   | `Value` Description |
+    | ---------------- | ------ | ------------------- |
+    | Content-Type \*  | string | `application-json`  |
+    | Authorization \* | string | `Bearer <jwt>`      |
+
+    **Query Params**
+
+    Optional - Can be used for filtering and limiting results
+
+    | Name | Type | `Value` Description |
+    | --- | --- | --- |
+    | batchCode | string | Filter by batch code |
+    | batchName | string | Filter by batch name |
+    | manufacturerName | string | Filter by manufacturer name |
+    | manufacturerBatchNumber | string | Filter by manufacturer's batch number |
+    | manufacturingDate | string | Filter by manufacturing date, format `YYYY-MM-DD` |
+    | expiryDate | string | Filter by expiry date, format `YYYY-MM-DD` |
+    | $limit | number | Number of results to return (default `10`, max `50`) |
+    | $skip | number | Number of results to skip (default `0`, max `10000`) |
+    | $sort | object | Sort order, e.g. `$sort[createdAt]=-1` |
+    | $select | array[string] | Limit the fields returned per batch |
+
+  </TabItem>
+
+  <TabItem value="response" label="Response">
+    :::success `200: OK`
+    `data` is an array containing one object with the matching `items` and pagination info — same envelope shape as [List Inventory Items](./inventory.mdx#list-inventory-items).
+
+    ```json
+    {
+      "success": true,
+      "data": [
+        {
+          "items": [
+            {
+              "batchCode": "BTC0001",
+              "batchName": "B1",
+              "costPrice": 100,
+              "sellingPrice": 200,
+              "initialStock": 0,
+              "stock": 16,
+              "inventory": "1781076792335",
+              "warehouses": [
+                {
+                  "initialStock": 0,
+                  "lowStockAlert": null,
+                  "avgSellingPrice": 200,
+                  "avgCostPrice": 100,
+                  "stock": -7,
+                  "stockInHand": -7,
+                  "soldQuantity": 12,
+                  "purchaseQuantity": 5,
+                  "quantity": null,
+                  "stockStatus": null,
+                  "lastStockOutOn": "2026-09-15T18:30:01.000Z",
+                  "lastStockOutType": "INVOICE",
+                  "lastStockOutTo": "6aa6b4e86b94e10031bec97b",
+                  "lastStockInOn": null,
+                  "lastStockInType": null,
+                  "lastStockInFrom": null,
+                  "_id": "6a2a599d5692bd00218f6078",
+                  "warehouse": "69d4bd918ed2ae0020c482a6"
+                }
+              ]
+            }
+            // ...2 more batches with the same shape
+          ],
+          "total": 3,
+          "limit": 10,
+          "skip": 0
+        }
+      ]
+    }
+    ```
+    :::
+
+    :::danger `401: Unauthorized`
+    Invalid authentication.
+
+    ```json
+    { "name": "NotAuthenticated", "message": "Invalid login", "code": 401, "className": "not-authenticated", "data": { "message": "Invalid login" }, "errors": {} }
+    ```
+    :::
+
+  </TabItem>
+</Tabs>
+
+---
+
+### Get Inventory Batch by Code
+
+<HttpMethod type='get' /> `/api/v1/businesses/:urlKey/inventories/:sku/inventory-batches/:batchCode`
+
+This endpoint allows you to retrieve a single batch by its batch code.
+
+<Tabs>
+  <TabItem value="request" label="Request">
+    **Path Params**
+
+    `urlKey` - The unique identifier of the business. <br />
+    `sku` - The SKU of the batch-tracked inventory item. <br />
+    `batchCode` - The batch code to retrieve.
+
+    **Headers**
+
+    | Name             | Type   | `Value` Description |
+    | ---------------- | ------ | ------------------- |
+    | Content-Type \*  | string | `application-json`  |
+    | Authorization \* | string | `Bearer <jwt>`      |
+
+  </TabItem>
+
+  <TabItem value="response" label="Response">
+    :::success `200: OK`
+    ```json
+    {
+      "success": true,
+      "data": {
+        "batchCode": "BTC0001",
+        "batchName": "B1",
+        "costPrice": 100,
+        "sellingPrice": 200,
+        "initialStock": 0,
+        "stock": 16,
+        "inventory": "1781076792335",
+        "warehouses": [
+          {
+            "initialStock": 0,
+            "lowStockAlert": null,
+            "avgSellingPrice": 200,
+            "avgCostPrice": 100,
+            "stock": -7,
+            "stockInHand": -7,
+            "soldQuantity": 12,
+            "purchaseQuantity": 5,
+            "quantity": null,
+            "stockStatus": null,
+            "lastStockOutOn": "2026-09-15T18:30:01.000Z",
+            "lastStockOutType": "INVOICE",
+            "lastStockOutTo": "6aa6b4e86b94e10031bec97b",
+            "lastStockInOn": null,
+            "lastStockInType": null,
+            "lastStockInFrom": null,
+            "_id": "6a2a599d5692bd00218f6078",
+            "warehouse": "69d4bd918ed2ae0020c482a6"
+          }
+        ]
+      }
+    }
+    ```
+    :::
+
+    :::danger `401: Unauthorized`
+    Invalid authentication.
+
+    ```json
+    { "name": "NotAuthenticated", "message": "Invalid login", "code": 401, "className": "not-authenticated", "data": { "message": "Invalid login" }, "errors": {} }
+    ```
+    :::
+
+  </TabItem>
+</Tabs>
+
+---
+
+### Create Inventory Batch
+
+<HttpMethod type='post' /> `/api/v1/businesses/:urlKey/inventories/:sku/inventory-batches`
+
+This endpoint allows you to register a new batch under a batch-tracked inventory item.
+
+<Tabs>
+  <TabItem value="request" label="Request">
+    **Path Params**
+
+    `urlKey` - The unique identifier of the business. <br />
+    `sku` - The SKU of the batch-tracked inventory item.
+
+    **Headers**
+
+    | Name             | Type   | `Value` Description |
+    | ---------------- | ------ | ------------------- |
+    | Content-Type \*  | string | `application-json`  |
+    | Authorization \* | string | `Bearer <jwt>`      |
+
+    **Body**
+
+    | Name | Type | `Value` Description |
+    | --- | --- | --- |
+    | batchCode \* | string | Batch code — must be unique within this inventory item |
+    | batchName | string | Batch name |
+    | manufacturerName | string | Manufacturer name |
+    | manufacturerBatchNumber | string | Manufacturer's batch number |
+    | manufacturingDate | string | Manufacturing date, format `YYYY-MM-DD` |
+    | expiryDate | string | Expiry date, format `YYYY-MM-DD` |
+    | costPrice | number | Batch cost price |
+    | sellingPrice | number | Batch selling price |
+    | initialStock | number | Initial stock for this batch |
+    | vendor | string | `uniqueKey` of the supplying vendor — must be an existing client |
+    | **warehouses[]** | array[object] | Per-warehouse initial stock for this batch — only applicable when Warehouse Management is enabled |
+    | warehouses[].warehouseId \* | string | Warehouse code |
+    | warehouses[].quantity | number | Initial stock for this batch in this warehouse |
+    | **customFields[]** | array[object] | Custom fields — label must be pre-configured for the **Inventory Batches** category in Business Settings |
+    | customFields[].label | string | Custom field label |
+    | customFields[].value | string | Custom field value |
+
+  </TabItem>
+
+  <TabItem value="response" label="Response">
+    :::success `201: Created`
+    ```json
+    {
+      "success": true,
+      "data": {
+        "batchCode": "BTC-POSTMAN-005"
+      }
+    }
+    ```
+    :::
+
+    :::danger `401: Unauthorized`
+    Invalid authentication.
+
+    ```json
+    { "name": "NotAuthenticated", "message": "Invalid login", "code": 401, "className": "not-authenticated", "data": { "message": "Invalid login" }, "errors": {} }
+    ```
+    :::
+
+  </TabItem>
+</Tabs>
+
+---
+
+### Update Inventory Batch
+
+<HttpMethod type='patch' /> `/api/v1/businesses/:urlKey/inventories/:sku/inventory-batches/:batchCode`
+
+This endpoint allows you to update an existing batch.
+
+<Tabs>
+  <TabItem value="request" label="Request">
+    **Path Params**
+
+    `urlKey` - The unique identifier of the business. <br />
+    `sku` - The SKU of the batch-tracked inventory item. <br />
+    `batchCode` - The batch code to update.
+
+    **Headers**
+
+    | Name             | Type   | `Value` Description |
+    | ---------------- | ------ | ------------------- |
+    | Content-Type \*  | string | `application-json`  |
+    | Authorization \* | string | `Bearer <jwt>`      |
+
+    **Body**
+
+    Accepts any of the fields listed under [Create Inventory Batch](#create-inventory-batch) above (including `batchCode`, to rename the batch).
+
+  </TabItem>
+
+  <TabItem value="response" label="Response">
+    :::success `200: OK`
+    Same shape as [Get Inventory Batch by Code](#get-inventory-batch-by-code) above.
+
+    ```json
+    {
+      "success": true,
+      "data": {
+        "batchCode": "BTC0001",
+        "batchName": "B1",
+        "costPrice": 100,
+        "sellingPrice": 200,
+        "initialStock": 0,
+        "stock": 16,
+        "inventory": "1781076792335",
+        "warehouses": [
+          {
+            "initialStock": 0,
+            "lowStockAlert": null,
+            "avgSellingPrice": 200,
+            "avgCostPrice": 100,
+            "stock": -7,
+            "stockInHand": -7,
+            "soldQuantity": 12,
+            "purchaseQuantity": 5,
+            "quantity": null,
+            "stockStatus": null,
+            "lastStockOutOn": "2026-09-15T18:30:01.000Z",
+            "lastStockOutType": "INVOICE",
+            "lastStockOutTo": "6aa6b4e86b94e10031bec97b",
+            "lastStockInOn": null,
+            "lastStockInType": null,
+            "lastStockInFrom": null,
+            "_id": "6a2a599d5692bd00218f6078",
+            "warehouse": "69d4bd918ed2ae0020c482a6"
+          }
+        ]
+      }
+    }
+    ```
+    :::
+
+    :::danger `401: Unauthorized`
+    Invalid authentication.
+
+    ```json
+    { "name": "NotAuthenticated", "message": "Invalid login", "code": 401, "className": "not-authenticated", "data": { "message": "Invalid login" }, "errors": {} }
+    ```
+    :::
+
+  </TabItem>
+</Tabs>

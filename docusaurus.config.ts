@@ -41,6 +41,7 @@ const config: Config = {
       {
         docs: {
           sidebarPath: './sidebars.ts',
+          exclude: ['**/decisions.md'],
           // Please change this to your repo.
           // Remove this to remove the "edit this page" links.
           routeBasePath: '/',

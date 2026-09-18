@@ -12,6 +12,7 @@ To access Refrens API, you need to have API enabled on your business account. If
 
 The following points/rules are applicable across all API endpoints -
 
+- Base URL: `https://api.refrens.com`. Every endpoint path shown in this documentation is relative to this base URL.
 - API follows REST conventions, ie creating a resource is `POST`, fetching is `GET`, updates are `PATCH`
 - All API responses and request bodies are in JSON format.
 - Any request with the body should include `ContentType: application/json`
