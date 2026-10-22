@@ -20,3 +20,4 @@ The following points/rules are applicable across all API endpoints -
 - Most of the endpoints require an Authorization header with a JWT token in the following format -
 - Authorization: Bearer `<jwt>`
   - You can either obtain a token via [Authentication API](authentication) call or [Self Sign](authentication#self-signed-tokens) using privateKey provided by us.
+- To retry a create or payment call safely, send an `Idempotency-Key` header. See [Idempotency](idempotency).

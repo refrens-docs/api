@@ -23,6 +23,7 @@ This endpoint allows the you to add a payment to a specific invoice for a busine
     | ---------------- | ------ | ------------------- |
     | Content-Type \*  | string | `application-json`  |
     | Authorization \* | string | `Bearer <jwt>`      |
+    | Idempotency-Key | String | Optional. A unique string (up to 255 characters) that makes retries safe. See [Idempotency](./idempotency.mdx). |
 
     **Body**
 

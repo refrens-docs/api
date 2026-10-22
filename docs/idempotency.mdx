@@ -1,0 +1,112 @@
+---
+sidebar_position: 2.5
+---
+
+# Idempotency
+
+The API supports idempotency, so you can retry a request without doing the same thing twice. When you create a document, update it, or add a payment, send an idempotency key with the request. If the call times out or the connection drops, send the same request again with the same key. Refrens sends back the result of the first request. It does not create a second document or payment.
+
+An idempotency key is a unique string that you create. Refrens uses it to spot a retry of the same request. We suggest a V4 UUID. Keys can be up to 255 characters long. Don't put sensitive data, such as email addresses or customer names, in a key.
+
+Refrens keeps the result of the first successful request for 24 hours. If the first request fails, for example on a validation error, nothing is kept. Fix the problem and retry with the same key. If you reuse a key with a different request body, the API returns an error instead of guessing what you meant.
+
+### How to send it
+
+Add an `Idempotency-Key` header to your request.
+
+**Headers**
+
+| Name            | Type   | `Value` Description                                                                       |
+| --------------- | ------ | ----------------------------------------------------------------------------------------- |
+| Idempotency-Key | String | Any unique string of at most 255 characters, for example a UUID: `3f2b8c1e-5d4a-4e7b-9a10-6c2d8e4f1a77` |
+
+Use a new key for each new action. Reuse the same key only when you retry the same request.
+
+### Where it works
+
+The header is documented for these calls:
+
+- [Create New Invoice](./invoices.mdx#create-new-invoice) (works for any `billType`)
+- [Cancel Invoice](./invoices.mdx#cancel-invoice) (the invoice `PATCH` call)
+- [Create Expenditure](./expenditure.mdx#create-expenditure)
+- [Add Payment to Invoice](./payment-updates.mdx#add-payment-to-invoice)
+
+### What happens
+
+| Your request                                                  | What you get                                                                                                              |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| New key                                                       | Processed as normal. A successful (`2xx`) response is normally saved for 24 hours.                                        |
+| Same key, same body, first call has finished                  | If the first response was saved, the original status code and body come back, with the response header `Idempotent-Replayed: true`. Nothing is created again. |
+| Same key, same body, first call is still running              | `409` with `IDEMPOTENCY_REQUEST_IN_PROGRESS`. Retry shortly.                                                              |
+| Same key, different body                                      | `409` with `IDEMPOTENCY_KEY_CONFLICT`.                                                                                    |
+| Key longer than 255 characters                                | `400` with `INVALID_IDEMPOTENCY_KEY`.                                                                                     |
+| The request failed (any status that is not `2xx`)             | The key is released. Fix the problem, then retry with the same key.                                                       |
+| No key                                                        | No duplicate check. Every request is processed as new, so a retry can create a second document or payment.                |
+
+### Errors
+
+Match on the top-level `errorCode` field. It is the same value as `data.errorCode`.
+
+:::danger `409: Conflict`
+You used this key before with a different request body.
+
+```json #
+{
+  "name": "Conflict",
+  "message": "This Idempotency-Key was already used with a different request body",
+  "code": 409,
+  "className": "conflict",
+  "data": {
+    "errorCode": "IDEMPOTENCY_KEY_CONFLICT"
+  },
+  "errors": {},
+  "errorCode": "IDEMPOTENCY_KEY_CONFLICT"
+}
+```
+
+:::
+:::danger `409: Conflict`
+The first call with this key is still running.
+
+```json #
+{
+  "name": "Conflict",
+  "message": "A request with this Idempotency-Key is still being processed. Retry shortly.",
+  "code": 409,
+  "className": "conflict",
+  "data": {
+    "errorCode": "IDEMPOTENCY_REQUEST_IN_PROGRESS"
+  },
+  "errors": {},
+  "errorCode": "IDEMPOTENCY_REQUEST_IN_PROGRESS"
+}
+```
+
+:::
+:::danger `400: Bad Request`
+The key is longer than 255 characters.
+
+```json #
+{
+  "name": "BadRequest",
+  "message": "Idempotency-Key must be a single header value of at most 255 characters",
+  "code": 400,
+  "className": "bad-request",
+  "data": {
+    "errorCode": "INVALID_IDEMPOTENCY_KEY"
+  },
+  "errors": {},
+  "errorCode": "INVALID_IDEMPOTENCY_KEY"
+}
+```
+
+:::
+
+### Good to know
+
+- Keys expire after 24 hours.
+- A key is tied to your exact `Authorization` token and to the route (method and path). So two apps, or two endpoints, can use the same key string without clashing.
+- Tokens expire. App tokens last 1 day. If you retry with a new token, Refrens treats it as a new request, and it can create a duplicate.
+- The query string counts as part of the request. The same body with a different query string gives `409` with `IDEMPOTENCY_KEY_CONFLICT`.
+- If your client drops the connection mid-request, the key can stay locked for up to 2 minutes. A retry in that time gets `409` with `IDEMPOTENCY_REQUEST_IN_PROGRESS`. Wait, then retry.
+- This is separate from the Clients API duplicate check. See [Clients idempotency](./clients.mdx#idempotency). That check uses a different code, `IDEMPOTENCY_CONFLICT`.
