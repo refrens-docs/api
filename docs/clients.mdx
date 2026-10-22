@@ -17,9 +17,8 @@ The calling app must be attached to the business in the path, otherwise the requ
 :::
 
 :::note What this API does not do yet
-Only **create** and **get one** are available — anything else returns `405`, see
-[Unsupported operations](#unsupported-operations). Until editing ships, corrections are made in
-Refrens.
+**Create**, **get one**, and **find** are live. Editing and deleting are not live yet and return
+`405`; see [Unsupported operations](#unsupported-operations). Corrections are made in Refrens.
 :::
 
 ### Quick start
@@ -508,7 +507,7 @@ the API stored. See [Response shape](#response-shape) for the returned fields.
     | Name       | Description                                                            |
     | ---------- | ---------------------------------------------------------------------- |
     | `urlKey`   | The business urlKey provided by Refrens.                               |
-    | `clientId` | The reference you sent as `clientId` when the client was created.       |
+    | `clientId` | The reference you sent as `clientId` at create. For a client with no `clientId`, this can instead be the 24-character `_id` from [Find Clients](#find-clients). |
 
     **Headers**
 
@@ -518,6 +517,9 @@ the API stored. See [Response shape](#response-shape) for the returned fields.
 
     No request body and **no query parameters** — any query parameter is rejected with
     `400 INVALID_QUERY_FIELD`.
+
+    If a value matches both, the `clientId` match wins. An unknown, archived, or other-business `_id`
+    returns the same `404 CLIENT_NOT_FOUND`. Get responses do not include `_id`.
 
   </TabItem>
 
@@ -623,32 +625,291 @@ GET returns a client only when it exists in the business your app is attached to
 archived or deleted in Refrens. Everything else returns one indistinguishable
 `404 CLIENT_NOT_FOUND`.
 
-This endpoint addresses clients by `clientId`, so it reaches only clients created through this API.
-Clients created elsewhere in Refrens carry no `clientId` and cannot be fetched here. Until search
-ships, create the clients you need to read.
+Clients created elsewhere in Refrens have no `clientId`. Find them with [Find Clients](#find-clients),
+then fetch them with the `_id` from the result.
 
 Vendors created through this API are readable here too.
 
 ---
 
+### Find Clients
+
+<HttpMethod type='get' /> `/api/v1/businesses/:urlKey/clients`
+
+Lists and searches your business's clients. Archived clients and your own business record are left
+out. Vendors are included; use `isVendor` to narrow to vendors or away from them. Each item is the
+Get shape plus `_id`; see [Response shape](#response-shape).
+
+<Tabs>
+  <TabItem value="request" label="Request">
+    **Path Params**
+
+    | Name     | Type   | `Value` Description |
+    | -------- | ------ | ------------------- |
+    | `urlKey` | string | The business urlKey provided by Refrens. |
+
+    **Headers**
+
+    | Name             | Type   | `Value` Description |
+    | ---------------- | ------ | ------------------- |
+    | Authorization \* | string | `Bearer <jwt>`      |
+
+    **Pagination and sorting**
+
+    | Name     | Type   | `Value` Description |
+    | -------- | ------ | ------------------- |
+    | `$limit` | number | Page size. Whole number from `1` to `50`. Default `10`. |
+    | `$skip`  | number | Number of clients to skip. Whole number from `0` to `1000`. Default `0`. |
+    | `$sort`  | object | Bracket form, for example `?$sort[createdAt]=-1`. Fields: `createdAt`, `updatedAt`, `name`. Values: `1` (ascending) or `-1` (descending). Default: `createdAt`, newest first. |
+
+    **Structured filters**
+
+    Send several values three ways: commas (`?clientType=INDIVIDUAL,COMPANY`), repeat the key with
+    `[]` (`?country[]=IN&country[]=AE`), or `$in` (`?country[$in][]=IN&country[$in][]=AE`). Values
+    within one filter are joined with OR. Different filters are joined with AND. One bad value rejects
+    the whole call with `INVALID_QUERY_VALUE`.
+
+    | Name         | Type    | `Value` Description |
+    | ------------ | ------- | ------------------- |
+    | `clientType` | string  | `INDIVIDUAL` or `COMPANY`, uppercase and case-sensitive. |
+    | `isVendor`   | boolean | `true` or `false` only. One value. |
+    | `city`       | string  | Exact match. |
+    | `state`      | string  | Exact match. |
+    | `pincode`    | string  | Exact match. |
+    | `country`    | string  | Two-letter ISO country code in uppercase, such as `IN` or `AE`. Case-sensitive: `in` returns `INVALID_QUERY_VALUE`. |
+
+    **Exact-match lookups**
+
+    `email` is trimmed and lowercased, then matched exactly. For `phone`, spaces, dashes and parentheses
+    are stripped and a leading `+` is added, then it is matched exactly. Send the country code:
+    `919999988888` matches `+919999988888`. `gstin` is exact and case-sensitive. A value that matches
+    nothing returns an empty page, not an error.
+
+    | Name    | Type   | `Value` Description |
+    | ------- | ------ | ------------------- |
+    | `email` | string | Trimmed, lowercased, exact match. |
+    | `phone` | string | Normalized then exact match. Include the country code. |
+    | `gstin` | string | Exact, case-sensitive match. |
+
+    **Ranges**
+
+    Both bounds are inclusive. Either may be left out. Both take ISO-8601 dates. A date with no time
+    means midnight UTC, so `createdAtTo=2026-10-01` stops at the start of 1 October; send
+    `2026-10-01T23:59:59.999Z` to include that whole day. A bad date, or From after To, returns
+    `INVALID_QUERY_VALUE`.
+
+    | Name            | Type   | `Value` Description |
+    | --------------- | ------ | ------------------- |
+    | `createdAtFrom` | string | Clients created on or after this ISO-8601 date. |
+    | `createdAtTo`   | string | Clients created on or before this ISO-8601 date. |
+
+    There is no `updatedAt` range. To find recent changes, sort by `$sort[updatedAt]=-1` and read
+    pages until you reach clients you have already seen.
+
+    **Free-text search**
+
+    `q` looks for your text in the client's name, alias, email and phone. You can use it together
+    with the other filters.
+
+    Your text only needs to match the start of a word. `q=Shar` finds "Sharma Foods" and
+    "Ravi Sharma". It does not find a client whose name only has those letters in the middle of a
+    word.
+
+    Results come back closest match first. `$sort` only orders clients that match equally well.
+
+    `400 SEARCH_UNAVAILABLE` is returned when search is switched off in an environment; use the
+    structured filters instead.
+
+    | Name | Type   | `Value` Description |
+    | ---- | ------ | ------------------- |
+    | `q`  | string | Free-text search. |
+
+    **Examples**
+
+    ```bash #
+    # Second page of ten, newest first
+    GET /api/v1/businesses/acme/clients?$limit=10&$skip=10
+
+    # Companies in India and the UAE
+    GET /api/v1/businesses/acme/clients?clientType=COMPANY&country[]=IN&country[]=AE
+
+    # Check a GSTIN before creating
+    GET /api/v1/businesses/acme/clients?gstin=29AAPFU0939F1ZV
+
+    # Find by email
+    GET /api/v1/businesses/acme/clients?email=accounts@acme.example
+
+    # Vendors only
+    GET /api/v1/businesses/acme/clients?isVendor=true
+
+    # Created in a date range
+    GET /api/v1/businesses/acme/clients?createdAtFrom=2026-10-01&createdAtTo=2026-10-01T23:59:59.999Z
+
+    # Free text
+    GET /api/v1/businesses/acme/clients?q=acm
+    ```
+
+  </TabItem>
+
+  <TabItem value="response" label="Response">
+    :::success `200: OK`
+    Items are in `data.items`. `total` counts every match, not just this page. `clientId` is `null`
+    for clients created outside this API.
+
+    ```json #
+    {
+      "success": true,
+      "data": {
+        "items": [
+          {
+            "_id": "<a 24-hex string>",
+            "clientId": "acme-042",
+            "name": "Acme Traders Pvt Ltd",
+            "clientType": "COMPANY",
+            "isClient": true,
+            "isVendor": false,
+            "country": "IN",
+            "gstin": "29AAPFU0939F1ZV",
+            "gstState": "29",
+            "panNumber": "AAPFU0939F",
+            "taxPayerType": "REG",
+            "locale": "en-IN",
+            "shippingDetails": [],
+            "bankAccounts": [],
+            "additionalIds": [],
+            "customFields": {},
+            "source": "API",
+            "createdAt": "2026-08-13T09:14:22.481Z",
+            "updatedAt": "2026-08-13T09:31:07.220Z",
+            "balance": {
+              "invoice": 25000,
+              "proforma": 0,
+              "creditNote": 0,
+              "paymentReceipt": 10000,
+              "debitNote": 0,
+              "salesOrder": 0,
+              "invoicePayment": 10000,
+              "proformaPayment": 0,
+              "expenditure": 0,
+              "expenditurePayment": 0,
+              "creditConsumed": 0,
+              "currency": "INR"
+            }
+          },
+          {
+            "_id": "<another 24-hex string>",
+            "clientId": null,
+            "name": "Imported Client",
+            "clientType": "COMPANY",
+            "isClient": true,
+            "isVendor": false,
+            "country": "AE",
+            "source": "CLIENT_UPLOAD",
+            "createdAt": "2026-08-12T09:14:22.481Z",
+            "updatedAt": "2026-08-12T09:14:22.481Z"
+          }
+        ],
+        "total": 2,
+        "limit": 10,
+        "skip": 0
+      }
+    }
+    ```
+
+    No match is not an error, and never a `404`. You get a successful page with no items:
+
+    ```json #
+    {
+      "success": true,
+      "data": {
+        "items": [],
+        "total": 0,
+        "limit": 10,
+        "skip": 0
+      }
+    }
+    ```
+
+    :::
+    :::danger `400: Bad Request`
+    A query parameter was unknown, invalid, or out of bounds. The `error.code` identifies the reason.
+
+    ```json #
+    {
+      "name": "BadRequest",
+      "message": "Limit must be an integer between 1 and 50, requested 51",
+      "code": 400,
+      "className": "bad-request",
+      "data": {
+        "success": false,
+        "error": {
+          "message": "Limit must be an integer between 1 and 50, requested 51",
+          "code": "INVALID_PAGINATION_LIMIT",
+          "status": 400
+        }
+      },
+      "errors": {}
+    }
+    ```
+
+    :::
+
+  </TabItem>
+</Tabs>
+
+#### Reading a page
+
+Raise `$skip` until `skip + items.length` reaches `total`. Caps are `$limit` 50 and `$skip` 1000,
+so one set of filters reaches at most 1,050 rows. Narrow the filters, for example by a `createdAt`
+range, to walk more. Results can shift between calls if clients are added.
+
+#### Unknown values vs no matches
+
+| You send | You get |
+| -------- | ------- |
+| Unknown parameter name | `400 INVALID_QUERY_FIELD` |
+| Bad value, for example `clientType=PERSON` or `country=XX` | `400 INVALID_QUERY_VALUE` |
+| Valid value with no matches | `200` with empty `items` |
+
+#### Query safety
+
+Only the listed parameters are accepted. `$in` is the only operator. Anything else, such as `$regex`
+or `$ne`, returns `INVALID_QUERY_VALUE`.
+
+#### Find error codes
+
+| `error.code` | Status | When |
+| ------------ | ------ | ---- |
+| `INVALID_QUERY_FIELD` | 400 | Unknown parameter or `$sort` field, or a `$sort` not in bracket form. |
+| `INVALID_QUERY_VALUE` | 400 | A bad filter value, date, range, or unsupported operator. |
+| `INVALID_PAGINATION_LIMIT` | 400 | `$limit` is not a whole number from 1 to 50. |
+| `INVALID_PAGINATION_SKIP` | 400 | `$skip` is not a whole number from 0 to 1000. |
+| `SEARCH_UNAVAILABLE` | 400 | `q` was used where search is switched off. |
+| `PERMISSION_DENIED` | 403 | The app is not attached to this business. |
+| `SERVICE_ERROR` | 500 | Unexpected server error. |
+
+`401` has no `error.code`, matching the wording of the page's existing `401` note.
+
+---
+
 ### Response shape
 
-Both operations return the client in the same shape:
+Create and Get return this shape. Each Find item is this shape with `_id` added as the first field:
 
-- Your own reference as `clientId`.
-- Every stored field from the create tables above, including the three lists.
+- Your reference as `clientId` for a client created through this API, or `null` for a client created elsewhere in Refrens.
+- Every stored field from the [Create New Client](#create-new-client) body tables, including the three
+  lists: [additional ids](#additional-ids), [shipping addresses](#shipping-addresses) and
+  [bank accounts](#bank-accounts).
 - `customFields`, keyed by display name.
 - `source` — `API` for a client created through this API. Clients created elsewhere in Refrens carry
   their own origin, such as `INVOICE`, `CLIENT_DASHBOARD`, `CLIENT_UPLOAD`, `DASHBOARD`,
-  `INVOICE_BULK_UPLOAD`, `LEADFORM`, `PORTFOLIO`, `ZOHO`, `MARIKA` or `LEADAPI`.
+  `INVOICE_BULK_UPLOAD` or `LEADFORM`.
 - `createdAt` and `updatedAt`.
-- `balance` — a read-only summary derived from the client's documents and payments, with
-  `invoice`, `proforma`, `creditNote`, `paymentReceipt`, `debitNote`, `salesOrder`, `invoicePayment`,
-  `proformaPayment`, `expenditure`, `expenditurePayment`, `creditConsumed` and `currency`. It changes
+- `balance` — a read-only summary derived from the client's documents and payments. It changes
   as the client transacts, without this API being called.
 
-Create adds `"idempotent": true` on a retry that matched. No Refrens-internal identifier appears in
-any response, at any depth, and no error message names an internal field.
+Create adds `"idempotent": true` on a retry that matched. No Refrens-internal identifier appears,
+except the top-level `_id` on each Find item, and no error message names an internal field.
 
 ### Error codes
 
@@ -656,7 +917,11 @@ any response, at any depth, and no error message names an internal field.
 | ---------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------ |
 | `INVALID_FIELD`              | 400    | A body key outside the accepted set, a server-owned field, a wrongly typed value, or a body that is not a JSON object.         |
 | `INVALID_FIELD_VALUE`        | 400    | An accepted field carrying a malformed or unsupported value, or a missing `clientId` / `name`. Names the field as you sent it. |
-| `INVALID_QUERY_FIELD`        | 400    | Any query parameter on fetch, which takes none.                                                                                |
+| `INVALID_QUERY_FIELD`        | 400    | Any query parameter on Get, which takes none; or an unknown parameter or `$sort` field on Find.                               |
+| `INVALID_QUERY_VALUE`        | 400    | A Find query value is malformed, unsupported, or invalid.                                                                      |
+| `INVALID_PAGINATION_LIMIT`   | 400    | Find `$limit` is not a whole number between 1 and 50.                                                                          |
+| `INVALID_PAGINATION_SKIP`    | 400    | Find `$skip` is not a whole number between 0 and 1000.                                                                         |
+| `SEARCH_UNAVAILABLE`         | 400    | Find `q` was used where search is switched off.                                                                                |
 | `CUSTOM_FIELDS_NOT_ENABLED`  | 400    | `customFields` sent to a business without custom fields enabled.                                                               |
 | `INVALID_CUSTOM_FIELD`       | 400    | A custom field name the business has not defined, or has archived.                                                             |
 | `INVALID_CUSTOM_FIELD_VALUE` | 400    | A defined custom field carrying a value it does not accept.                                                                    |
@@ -673,11 +938,13 @@ envelope applies.
 | Surface         | Bad name               | Bad value                     |
 | --------------- | ---------------------- | ----------------------------- |
 | Body field      | `INVALID_FIELD`        | `INVALID_FIELD_VALUE`         |
-| Query parameter | `INVALID_QUERY_FIELD`  | — (fetch takes no parameters) |
+| Query parameter | `INVALID_QUERY_FIELD`  | `INVALID_QUERY_VALUE`         |
 | Custom field    | `INVALID_CUSTOM_FIELD` | `INVALID_CUSTOM_FIELD_VALUE`  |
 
 ### Unsupported operations
 
-Listing, searching, editing and deleting clients are not available yet. `GET` on the collection, and
-`PATCH`, `PUT` or `DELETE` on a client, all return `405` — the status alone, with no `error.code` —
-so you can tell an operation that is not built apart from a client that is not there.
+You can't edit or delete clients through the API yet. `PATCH`, `PUT` and `DELETE` on a client return
+`405`.
+
+A `405` has no `error.code`. That is how you tell it apart from `404 CLIENT_NOT_FOUND`: a `405` means
+the action is not built yet, and a `404` means the client is not there.
