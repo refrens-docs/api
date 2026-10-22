@@ -22,6 +22,7 @@ This endpoint allows you to create an invoice
     | ---------------- | ------ | ------------------- |
     | Content-Type \*  | string | `application-json`  |
     | Authorization \* | string | `Bearer <jwt>`      |
+    | Idempotency-Key | String | Optional. A unique string (up to 255 characters) that makes retries safe. Works for any billType. See [Idempotency](./idempotency.mdx). |
 
     **Body**
 
@@ -444,6 +445,7 @@ This endpoint allows you to update an invoice for a specific business.
     | ---------------- | ------ | ------------------- |
     | Content-Type \*  | string | `application-json`  |
     | Authorization \* | string | `Bearer <jwt>`      |
+    | Idempotency-Key | String | Optional. A unique string (up to 255 characters) that makes retries safe. See [Idempotency](./idempotency.mdx). |
 
     **Body**
 
